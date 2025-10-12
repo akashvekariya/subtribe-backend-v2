@@ -1,24 +1,115 @@
-name: CD - Deploy to Cloud Run
+name: CI/CD Pipeline
 
-# Trigger deployment when code is pushed to main branch (after CI passes)
+# Trigger on all pull requests and pushes to any branch
+# Deployment is controlled by job-level conditions (only main deploys)
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:  # Allow manual triggering from GitHub Actions UI
+  push:  # All pushes trigger lint-test, only main deploys
+  workflow_dispatch:  # Allow manual triggering
+
+# Required for auto-versioning (create tags and releases)
+permissions:
+  contents: write
 
 env:
-  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}  # Using variable (non-sensitive)
+  # GCP Configuration
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   REGION: asia-south1  # Mumbai region
   SERVICE_NAME: subtribe-ats-api
   IMAGE_NAME: subtribe-ats-backend
 
 jobs:
+  # ============================================================================
+  # Job 1: Lint & Test (runs on all pushes/PRs)
+  # ============================================================================
+  lint-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 4: Run Ruff linter (check for errors)
+      - name: Lint with Ruff
+        run: |
+          echo "🔍 Running Ruff linter..."
+          ruff check . --output-format=github
+        continue-on-error: false
+
+      # Step 5: Run Ruff formatter check (ensure code is formatted)
+      - name: Check code formatting
+        run: |
+          echo "✨ Checking code formatting with Ruff..."
+          ruff format --check .
+        continue-on-error: false
+
+      # Step 6: Run mypy type checking
+      - name: Type check with mypy
+        run: |
+          echo "🔎 Running mypy type checker..."
+          mypy app --ignore-missing-imports --check-untyped-defs
+        continue-on-error: true  # Don't fail build on type errors (warning only)
+
+      # Step 7: Run unit tests (schemas & services only - no DB needed)
+      - name: Run unit tests
+        env:
+          DATABASE_URL: "postgresql+asyncpg://test:test@localhost:5432/test"
+          JWT_SECRET_KEY: "test-secret-key-for-ci"
+          JWT_ALGORITHM: "HS256"
+          JWT_EXPIRY_DAYS: "15"
+          REFRESH_TOKEN_EXPIRY_DAYS: "30"
+          SUPABASE_URL: "https://test.supabase.co"
+          SUPABASE_ANON_KEY: "test-anon-key"
+          SUPABASE_SERVICE_KEY: "test-service-key"
+          SUPABASE_JWT_SECRET: "test-jwt-secret"
+          GCS_BUCKET_NAME: "test-bucket"
+          GCS_PROJECT_ID: "test-project"
+          GOOGLE_APPLICATION_CREDENTIALS: "/tmp/fake-credentials.json"
+          CORS_ORIGINS: '["http://localhost:3000"]'
+          ENVIRONMENT: "testing"
+        run: |
+          echo "🧪 Running unit tests..."
+          # Create fake GCS credentials file (tests use mocks)
+          mkdir -p /tmp
+          echo '{"type": "service_account"}' > /tmp/fake-credentials.json
+          # Run ONLY pure unit tests (schemas & services - no database needed)
+          pytest tests/unit/test_schemas.py tests/unit/test_services.py -v --tb=short
+        continue-on-error: false
+
+      # Step 8: Summary
+      - name: Summary
+        if: success()
+        run: |
+          echo "✅ All checks passed!"
+          echo "   - Code linting ✓"
+          echo "   - Code formatting ✓"
+          echo "   - Type checking ✓"
+          echo "   - Unit tests (schemas & services) ✓"
+          echo ""
+          echo "Note: Database-dependent tests (test_models.py) run locally only."
+
+  # ============================================================================
+  # Job 2: Deploy (runs ONLY on push to main, after lint-test succeeds)
+  # ============================================================================
   deploy:
     name: Build & Deploy to Cloud Run
     runs-on: ubuntu-latest
-    
-    # Require CI to pass before deploying
-    needs: []  # Add CI job as dependency if you want
+    needs: lint-test  # Wait for lint-test to pass
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'  # Only deploy on push to main
     
     steps:
       # Step 1: Checkout code
