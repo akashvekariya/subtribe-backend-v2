@@ -20,9 +20,11 @@ class StorageService:
 
     def __init__(self):
         """Initialize GCS client and bucket."""
-        # Set GCS credentials from environment
-        if settings.google_application_credentials:
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = settings.google_application_credentials
+        # Set GCS credentials from environment (skip if /dev/null or doesn't exist)
+        # In Cloud Run, credentials come from the service account automatically (ADC)
+        creds_path = settings.google_application_credentials
+        if creds_path and creds_path != "/dev/null" and os.path.exists(creds_path):
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
 
         self._client: storage.Client | None = None
         self._bucket: storage.Bucket | None = None

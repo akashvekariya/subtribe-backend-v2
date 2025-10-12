@@ -27,7 +27,9 @@ class Settings(BaseSettings):
     # Google Cloud Storage
     gcs_bucket_name: str
     gcs_project_id: str
-    google_application_credentials: str
+    google_application_credentials: str = (
+        "/dev/null"  # Not needed in Cloud Run (uses service account)
+    )
 
     # App Config
     cors_origins: list[str] | str = ["http://localhost:3000"]
