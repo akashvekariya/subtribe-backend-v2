@@ -1,5 +1,9 @@
 # CI/CD Pipeline Setup & Usage
 
+> **Status**: ✅ Production Deployed & Tested (2025-10-12)  
+> **Workflow**: `.github/workflows/main.yml`  
+> **Cloud Run**: Live and operational
+
 ## 📋 Table of Contents
 1. [Overview](#overview)
 2. [Quick Start](#quick-start)

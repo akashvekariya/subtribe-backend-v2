@@ -106,9 +106,9 @@ You:
 
 ## Current Status
 
-**Phase**: 0 - Environment Setup  
-**Status**: Documentation complete, not started implementation  
-**Next Action**: Create Supabase project (see plan.md Phase 0)
+**Phase**: Phase 9 Complete ✅  
+**Status**: **PRODUCTION DEPLOYED & TESTED** 🚀  
+**Next Action**: Phase 10 - Pilot Launch (onboard first company, collect feedback)
 
 **Check**: Always read [`progress.md`](./vibe-plan/progress.md) for latest status before starting work.
 
@@ -469,17 +469,19 @@ You:
 
 ---
 
-**Last Updated**: 2025-10-02  
-**Current Phase**: Phase 0 (Environment Setup)  
-**Next**: Proceed with Phase 0 - Environment Setup
+**Last Updated**: 2025-10-12  
+**Current Phase**: Phase 9 Complete ✅ - Production Deployed  
+**Next**: Phase 10 - Pilot Launch
 
-**Recent Changes (2025-10-02)**:
-- ❌ Removed: Google OAuth, Invitation system, Multi-role RBAC, User management endpoints
-- ✅ Simplified: Job status (active/closed only), JWT expiry (20 days), Everyone is admin
-- ✅ Added: Company profile endpoints (logo, tagline, about), Salary fields in applications
-- ✅ User Registration: Company code signup (e.g., user enters `ACME-x7k9p2` during registration)
-- ✅ Clarified: Status history tracking (keep with notes), Resume parsing (critical for AI)
-- 📝 TODO: Finalize application fields with user before Phase 6 implementation
+**Recent Changes (2025-10-12)**:
+- ✅ Phase 9 Complete: Deployment & CI/CD
+- ✅ Dockerfile with multi-stage build (builder + runtime)
+- ✅ GitHub Actions CI/CD with lint, test, and automated deployment
+- ✅ Semantic versioning based on conventional commits
+- ✅ Automated Cloud Run deployment on merge to main
+- ✅ Production environment tested and verified
+- ✅ All unit tests passing, integration/E2E tests disabled for MVP
+- ✅ Code quality: Ruff, Mypy, zero warnings
 
 ---
 

@@ -1,5 +1,7 @@
 # Subtribe ATS Backend
 
+> **Status**: ✅ Production Deployed & Tested (2025-10-12)
+
 Multi-tenant SaaS Applicant Tracking System for small-medium recruiting companies.
 
 ## Tech Stack
@@ -177,13 +179,19 @@ ENVIRONMENT=development
 
 ## Documentation
 
-- **[`.github/README.md`](.github/README.md)** - CI/CD setup and deployment guide
-- **[`vibe-plan/`](vibe-plan/)** - Detailed project documentation
-  - `PRD.md` - Product requirements
-  - `api-design.md` - API specifications
-  - `database.md` - Database schema
-  - `plan.md` - Implementation roadmap
-  - `progress.md` - Development progress
+**📚 [View Full Documentation on GitHub Wiki →](../../wiki)**
+
+### Quick Links
+- [Architecture](../../wiki/Architecture) - System design and tech stack
+- [API Reference](../../wiki/API-Reference) - Complete endpoint documentation
+- [Database Schema](../../wiki/Database-Schema) - Tables and relationships
+- [Development Guide](../../wiki/Development) - Local setup and patterns
+- [Deployment Guide](../../wiki/Deployment) - CI/CD and Cloud Run
+- [Project Status](../../wiki/Project-Status) - Current phase and roadmap
+
+### Additional Resources
+- **[CI/CD Setup](.github/README.md)** - GitHub Actions configuration guide
+- **[Legacy Docs](vibe-plan/)** - Original planning documents (archived)
 
 ## License
 

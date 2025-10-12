@@ -12,6 +12,10 @@ app = FastAPI(
     description="Multi-tenant Applicant Tracking System",
     version="1.0.0",
     debug=settings.debug,
+    # Disable docs in production for security
+    docs_url="/docs" if settings.environment == "development" else None,
+    redoc_url="/redoc" if settings.environment == "development" else None,
+    openapi_url="/openapi.json" if settings.environment == "development" else None,
 )
 
 
