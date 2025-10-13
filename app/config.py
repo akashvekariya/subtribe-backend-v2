@@ -34,7 +34,6 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
 
-
     model_config = SettingsConfigDict(
         env_file=f".env.{os.getenv('ENVIRONMENT', 'development')}",
         env_file_encoding="utf-8",
