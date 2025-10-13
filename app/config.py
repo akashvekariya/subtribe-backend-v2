@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     )
 
     # App Config
-    cors_allowed_origins: str  # Regex pattern from env
+    cors_allowed_origins: str = r"^https?://localhost(:\d+)?$"  # Regex pattern from env
     environment: str = "development"
     debug: bool = True
 
