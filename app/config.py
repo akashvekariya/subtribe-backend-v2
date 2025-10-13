@@ -1,9 +1,7 @@
 """Application configuration using Pydantic Settings."""
 
-import json
 import os
 
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,23 +30,10 @@ class Settings(BaseSettings):
     )
 
     # App Config
-    cors_origins: list[str] | str = ["http://localhost:3000"]
+    cors_allowed_origins: str  # Regex pattern from env
     environment: str = "development"
     debug: bool = True
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v):
-        """Parse CORS_ORIGINS from JSON string or comma-separated string."""
-        if isinstance(v, str):
-            # Try JSON first
-            try:
-                parsed = json.loads(v)
-                return parsed if isinstance(parsed, list) else [parsed]
-            except (json.JSONDecodeError, ValueError):
-                # Fallback to comma-separated or single value
-                return [v.strip()] if v.strip() else ["*"]
-        return v
 
     model_config = SettingsConfigDict(
         env_file=f".env.{os.getenv('ENVIRONMENT', 'development')}",

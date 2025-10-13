@@ -40,6 +40,9 @@
   - Security
   - Testing
 
+- **[CORS-SETUP](CORS-SETUP)**
+  - Allowed origin setup
+
 ---
 
 ### Project
