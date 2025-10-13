@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from jose import jwt
 from passlib.context import CryptContext
 from sqlalchemy import select
@@ -60,7 +60,7 @@ def create_access_token(
 @router.post(
     "/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, tags=["Auth"]
 )
-async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(response: Response, data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """
     Register new user with company code.
 
@@ -118,7 +118,17 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
         last_name=user.last_name,
     )
 
-    # Build response
+    # Set httpOnly cookie (secure for browsers)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,  # Not accessible via JavaScript
+        secure=settings.environment == "production",  # HTTPS only in production
+        samesite="lax",  # CSRF protection
+        max_age=settings.jwt_expiry_days * 24 * 60 * 60,  # seconds
+    )
+
+    # Build response (also return token in body for API clients)
     return AuthResponse(
         user=UserResponse(
             id=str(user.id),
@@ -136,7 +146,7 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=AuthResponse, tags=["Auth"])
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(response: Response, data: LoginRequest, db: AsyncSession = Depends(get_db)):
     """
     Login with email/password.
 
@@ -181,7 +191,17 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
         last_name=user.last_name,
     )
 
-    # Build response
+    # Set httpOnly cookie (secure for browsers)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,  # Not accessible via JavaScript
+        secure=settings.environment == "production",  # HTTPS only in production
+        samesite="lax",  # CSRF protection
+        max_age=settings.jwt_expiry_days * 24 * 60 * 60,  # seconds
+    )
+
+    # Build response (also return token in body for API clients)
     return AuthResponse(
         user=UserResponse(
             id=str(user.id),
@@ -196,6 +216,17 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
         access_token=access_token,
         expires_at=expires_at,
     )
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK, tags=["Auth"])
+async def logout(response: Response):
+    """
+    Logout user by clearing authentication cookie.
+
+    Note: For API clients using Authorization header, simply discard the token on client side.
+    """
+    response.delete_cookie(key="access_token")
+    return {"message": "Successfully logged out"}
 
 
 @router.get("/me", response_model=MeResponse, tags=["Auth"])

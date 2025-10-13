@@ -8,11 +8,22 @@
 
 ## Authentication
 
-### Headers
-All protected endpoints require:
+### Two Methods Supported
+
+**Method 1: HttpOnly Cookie** (Recommended for web browsers)
+- Automatically set on login/register
+- Secure, XSS-protected
+- Browser sends automatically
+
+**Method 2: Authorization Header** (For API clients, curl, Postman)
 ```
 Authorization: Bearer <jwt_token>
 ```
+
+### Priority
+1. Cookie checked first (if present)
+2. Falls back to Authorization header
+3. Use either method - both work!
 
 ### JWT Response Format
 ```json
@@ -67,6 +78,8 @@ Register new user with company code.
 - `400` - Invalid company code
 - `409` - Email already exists
 
+**Cookie**: Sets `access_token` httpOnly cookie automatically
+
 ---
 
 #### POST /auth/login
@@ -91,6 +104,22 @@ Login with credentials.
 
 **Errors**:
 - `401` - Invalid credentials
+
+**Cookie**: Sets `access_token` httpOnly cookie automatically
+
+---
+
+#### POST /auth/logout
+Logout and clear authentication cookie.
+
+**Response** `200`:
+```json
+{
+  "message": "Successfully logged out"
+}
+```
+
+**Note**: For API clients using Authorization header, simply discard the token client-side.
 
 ---
 
