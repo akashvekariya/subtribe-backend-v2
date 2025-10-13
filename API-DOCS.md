@@ -255,10 +255,9 @@ Create job posting. 🔒 Auth required
 ---
 
 #### GET /jobs
-List company jobs. 🔒 Auth required
+List company jobs with pagination. 🔒 Auth required
 
-**Query Params**:
-- `status` (optional): `draft` | `active` | `closed`
+**Query Parameters**:
 - `page` (optional): Page number (default: 1)
 - `limit` (optional): Items per page (default: 20, max: 100)
 
@@ -273,18 +272,22 @@ List company jobs. 🔒 Auth required
       "status": "active",
       "position_type": "full_time",
       "location_type": "remote",
-      "applications_count": 45,
       "views_count": 1250,
+      "created_by": "uuid",
+      "creator": {
+        "id": "uuid",
+        "full_name": "Jane Smith"
+      },
       "published_at": "2025-01-10T...",
-      "created_at": "2025-01-09T...",
-      "updated_at": "2025-01-10T..."
+      "created_at": "2025-01-09T..."
     }
   ],
   "pagination": {
     "page": 1,
     "limit": 20,
-    "total": 5,
-    "pages": 1
+    "total": 138,
+    "pages": 7,
+    "has_more": true
   }
 }
 ```
@@ -613,24 +616,50 @@ All errors follow this format:
 
 ## Common Patterns
 
-### Pagination
-All list endpoints support:
-```
-?page=1&limit=20
-```
+### Response Structure
 
-Response includes:
+**List Endpoints** (return multiple items):
 ```json
 {
   "data": [...],
   "pagination": {
     "page": 1,
     "limit": 20,
-    "total": 125,
-    "pages": 7
+    "total": 138,
+    "pages": 7,
+    "has_more": true
   }
 }
 ```
+
+Examples:
+- `GET /jobs` - List of jobs
+- `GET /jobs/{job_id}/applications` - List of applications
+- `GET /applications/{id}/history` - List of status changes
+
+**Single Resource Endpoints** (return one item):
+```json
+{
+  "id": "uuid",
+  "title": "...",
+  ...
+}
+```
+
+Examples:
+- `GET /jobs/{id}` - Single job
+- `GET /applications/{id}` - Single application
+- `GET /auth/me` - Current user
+- `GET /companies/me` - Company profile
+
+### Pagination
+List endpoints support:
+```
+?page=1&limit=20
+```
+
+Default: page=1, limit=20  
+Max limit: 100
 
 ### Date Format
 All timestamps are ISO 8601 with timezone:

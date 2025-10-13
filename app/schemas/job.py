@@ -205,6 +205,23 @@ class JobListItem(BaseModel):
     created_at: datetime
 
 
+class PaginationMeta(BaseModel):
+    """Pagination metadata."""
+
+    page: int
+    limit: int
+    total: int
+    pages: int
+    has_more: bool
+
+
+class JobListResponse(BaseModel):
+    """Response for job list with data wrapper and pagination."""
+
+    data: list[JobListItem]
+    pagination: PaginationMeta
+
+
 class PublicJobResponse(BaseModel):
     """Public job response for candidates (no sensitive data)."""
 

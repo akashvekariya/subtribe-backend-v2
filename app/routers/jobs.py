@@ -17,13 +17,13 @@ from app.models.job import Job
 from app.schemas.application import (
     ApplicationListItem,
     ApplicationListResponse,
-    PaginationMeta,
 )
 from app.schemas.job import (
     JobCreate,
-    JobListItem,
+    JobListResponse,
     JobResponse,
     JobUpdate,
+    PaginationMeta,
     PublicJobResponse,
 )
 
@@ -136,29 +136,54 @@ async def create_job(
     return job_with_relations
 
 
-@router.get("", response_model=list[JobListItem], tags=["Jobs"])
+@router.get("", response_model=JobListResponse, tags=["Jobs"])
 async def list_jobs(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Items per page"),
 ):
     """
-    List all jobs for the current user's company.
+    List all jobs for the current user's company with pagination.
 
-    - Returns all jobs (draft, active, closed)
+    - Returns jobs (draft, active, closed)
     - Multi-tenant filtered by company_id
-    - No pagination for MVP (client-side filtering)
+    - Paginated with metadata
     """
+    # Count total jobs
+    count_stmt = (
+        select(func.count()).select_from(Job).where(Job.company_id == current_user["company_id"])
+    )
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar_one()
+
+    # Calculate pagination
+    pages = (total + limit - 1) // limit  # Ceiling division
+    offset = (page - 1) * limit
+
+    # Get paginated jobs
     stmt = (
         select(Job)
         .where(Job.company_id == current_user["company_id"])
         .options(selectinload(Job.creator))
         .order_by(Job.created_at.desc())
+        .offset(offset)
+        .limit(limit)
     )
 
     result = await db.execute(stmt)
     jobs = result.scalars().all()
 
-    return jobs
+    return JobListResponse(
+        data=jobs,
+        pagination=PaginationMeta(
+            page=page,
+            limit=limit,
+            total=total,
+            pages=pages,
+            has_more=page < pages,
+        ),
+    )
 
 
 @router.get("/{job_id}", response_model=JobResponse, tags=["Jobs"])

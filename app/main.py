@@ -13,9 +13,9 @@ app = FastAPI(
     version="1.0.0",
     debug=settings.debug,
     # Disable docs in production for security
-    docs_url="/docs" if settings.environment == "development" else None,
-    redoc_url="/redoc" if settings.environment == "development" else None,
-    openapi_url="/openapi.json" if settings.environment == "development" else None,
+    docs_url="/docs" if settings.environment != "production" else None,
+    redoc_url="/redoc" if settings.environment != "production" else None,
+    openapi_url="/openapi.json" if settings.environment != "production" else None,
 )
 
 
