@@ -178,11 +178,13 @@ class StorageService:
             filename = path.split("/")[-1]
 
             # Generate signed URL
+            # Note: Requires service account credentials (not user credentials)
             url = blob.generate_signed_url(
                 version="v4",
                 expiration=timedelta(minutes=expiration_minutes),
                 method="GET",
                 response_disposition=f'{disposition}; filename="{filename}"',
+                service_account_email=self.client.get_service_account_email(),
             )
 
             logger.info(f"Generated signed URL for: {path} (expires in {expiration_minutes}m)")

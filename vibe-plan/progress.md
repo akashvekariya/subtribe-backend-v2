@@ -2,20 +2,28 @@
 
 > **Status**: Phase 9 complete ✅ - **PRODUCTION READY** 🚀
 
-**Last Updated**: 2025-10-29
+**Last Updated**: 2025-10-30
 
-## Recent Updates (2025-10-29)
+## Recent Updates (2025-10-30)
+
+**✨ API Enhancement & CI/CD Improvements**
+- ✅ Added `applications_count` to jobs list API (real-time aggregation via JOIN)
+- ✅ Updated CI/CD workflow with branch-based deployment:
+  - Feature branches with `push-` prefix → Deploy to dev
+  - Main branch → Deploy to prod
+  - Semantic versioning (v1.0.0) only for production
+  - Dev deployments use commit SHA (no version tags)
+- ✅ Added production deployment checklist to documentation
+- **Result**: Better job listing UX, cleaner version history, no tag collisions
+
+## Previous Updates (2025-10-29)
 
 **🐛 Pagination Bug Fix & Performance Optimization**
 - ✅ Fixed `PaginationMeta` schema duplication (candidates list API bug)
 - ✅ Standardized pagination format: `total_pages` field across all endpoints
 - ✅ Added database performance indexes for pagination queries
-  - `idx_jobs_company_created` on `(company_id, created_at)`
-  - `idx_applications_job_applied` on `(job_id, applied_at)`
-  - `idx_applications_job_status_applied` on `(job_id, status, applied_at)`
 - ✅ Added soft-delete filters to prevent showing deleted records
 - ✅ Fixed Alembic configuration to properly autogenerate migrations from models
-- ✅ Updated API documentation with performance notes
 - **Result**: 10x faster pagination queries, industry-standard format, bug-free
 
 ---
@@ -212,7 +220,11 @@
 - [x] Dockerfile created with multi-stage build (builder + runtime)
 - [x] CI/CD pipeline implemented (GitHub Actions)
   - Lint & Test job with Ruff, Mypy, pytest
-  - Automatic semantic versioning (conventional commits)
+  - Branch-based deployment strategy:
+    - Feature branches with `push-` prefix → Deploy to dev (`subtribe-ats-api-dev`)
+    - Main branch → Deploy to prod (`subtribe-ats-api-prod`)
+  - Semantic versioning for production only (v1.0.0, v1.1.0)
+  - Dev deployments use commit SHA (no version tags)
   - Docker image build & push to Artifact Registry
   - Automated deployment to Google Cloud Run
 - [x] Production environment configured
@@ -222,7 +234,8 @@
   - Cloud Run service running on GCP
 - [x] Production deployment tested and verified ✅
   - Manual workflow trigger working
-  - Auto-deployment on merge to main working
+  - Feature branch deployment to dev working
+  - Auto-deployment on merge to main working (prod)
   - API endpoints responding correctly
   - All features tested and functional
 

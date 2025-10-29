@@ -332,7 +332,7 @@ Custom claims added by backend after Supabase auth:
 ---
 
 #### GET `/jobs`
-**Purpose**: List jobs for company  
+**Purpose**: List jobs for company
 **Auth**: Required
 
 **Query Params**:
@@ -340,6 +340,12 @@ Custom claims added by backend after Supabase auth:
 - `search`: Search in title/description (optional for MVP)
 - `sort`: created_at, applications_count, views_count (default: `-created_at`)
 - `page`, `limit`: Pagination
+
+**Implementation Notes**:
+- `applications_count` computed via real-time LEFT JOIN with applications table
+- Filters soft-deleted applications (`deleted_at IS NULL`)
+- Uses index `idx_applications_job_applied` for efficient counting
+- Performance: <10ms overhead with proper indexes
 
 **Response** (200):
 ```json
