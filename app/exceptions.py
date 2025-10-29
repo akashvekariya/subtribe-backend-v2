@@ -117,7 +117,10 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "error": {
                     "type": "conflict_error",
                     "code": "database_constraint",
-                    "message": "Database constraint violation. This error should be handled in the endpoint.",
+                    "message": (
+                        "Database constraint violation. "
+                        "This error should be handled in the endpoint."
+                    ),
                     "details": {"raw_error": str(exc.orig) if hasattr(exc, "orig") else str(exc)},
                 }
             },

@@ -8,13 +8,18 @@
 
 **✨ API Enhancement & CI/CD Improvements**
 - ✅ Added `applications_count` to jobs list API (real-time aggregation via JOIN)
+- ✅ Fixed resume signed URL generation (view/download endpoints)
+  - Uses service account credentials with private key for URL signing
+  - 1-hour expiry for security
+  - Works locally and in Cloud Run
 - ✅ Updated CI/CD workflow with branch-based deployment:
   - Feature branches with `push-` prefix → Deploy to dev
   - Main branch → Deploy to prod
   - Semantic versioning (v1.0.0) only for production
   - Dev deployments use commit SHA (no version tags)
 - ✅ Added production deployment checklist to documentation
-- **Result**: Better job listing UX, cleaner version history, no tag collisions
+- ✅ Fixed linting issues (E501, E402) across codebase
+- **Result**: Better job listing UX, working resume access, cleaner version history
 
 ## Previous Updates (2025-10-29)
 

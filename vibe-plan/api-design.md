@@ -452,7 +452,7 @@ Custom claims added by backend after Supabase auth:
 ---
 
 #### GET `/applications/{application_id}`
-**Purpose**: Get application details  
+**Purpose**: Get application details
 **Auth**: Required
 
 **Response** (200):
@@ -467,7 +467,7 @@ Custom claims added by backend after Supabase auth:
   "linkedin_url": "string?",
   "github_url": "string?",
   "portfolio_url": "string?",
-  "resume_url": "string",
+  "resume_url": "string (GCS URI: gs://bucket/path/to/file.pdf)",
   "resume_filename": "string",
   "screening_answers": {},
   "status": "string",
@@ -482,6 +482,47 @@ Custom claims added by backend after Supabase auth:
   "created_at": "timestamp"
 }
 ```
+
+**Note**: `resume_url` is a GCS URI. To get a viewable/downloadable URL, use the endpoints below.
+
+---
+
+#### GET `/applications/{application_id}/resume/view`
+**Purpose**: Get signed URL for viewing resume in browser
+**Auth**: Required
+
+**Response** (200):
+```json
+{
+  "url": "https://storage.googleapis.com/...(signed URL)",
+  "filename": "resume.pdf",
+  "expires_at": "2025-10-30T12:00:00Z"
+}
+```
+
+**Implementation Notes**:
+- Returns signed URL valid for 1 hour
+- Uses service account credentials for URL signing
+- Opens in browser with `inline` disposition
+
+---
+
+#### GET `/applications/{application_id}/resume/download`
+**Purpose**: Get signed URL for downloading resume
+**Auth**: Required
+
+**Response** (200):
+```json
+{
+  "url": "https://storage.googleapis.com/...(signed URL)",
+  "filename": "resume.pdf",
+  "expires_at": "2025-10-30T12:00:00Z"
+}
+```
+
+**Implementation Notes**:
+- Returns signed URL valid for 1 hour
+- Forces browser download with `attachment` disposition
 
 ---
 
