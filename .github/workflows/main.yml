@@ -151,9 +151,12 @@ jobs:
           echo "Environment: ${{ steps.deployment_target.outputs.env_name }}"
           echo "Service: ${{ steps.deployment_target.outputs.service_name }}"
 
-      # Step 3: Bump version and create tag
+      # Step 3: Bump version and create tag (PRODUCTION ONLY)
+      # REASON: Only create semantic versions for production deployments (main branch)
+      # Dev deployments use commit SHA instead to avoid version collisions
       - name: Bump version and push tag
         id: tag_version
+        if: github.ref == 'refs/heads/main'
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -161,8 +164,10 @@ jobs:
           release_branches: main
           tag_prefix: v
 
-      # Step 3: Create GitHub Release
+      # Step 4: Create GitHub Release (PRODUCTION ONLY)
+      # REASON: Only create releases for production versions
       - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.tag_version.outputs.new_tag }}
@@ -185,37 +190,40 @@ jobs:
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
       # Step 7: Build Docker image with version tags
-      # REASON: Use dynamic service_name from deployment_target step
+      # REASON: Use dynamic service_name and version (semantic for prod, SHA for dev)
       - name: Build Docker image
         run: |
-          echo "🔨 Building Docker image version ${{ steps.tag_version.outputs.new_tag }}..."
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag || github.sha }}"
+          echo "🔨 Building Docker image version $VERSION_TAG..."
           echo "🎯 Target: ${{ steps.deployment_target.outputs.service_name }}"
           docker build \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ steps.tag_version.outputs.new_tag }} \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:$VERSION_TAG \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:latest \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ github.sha }} \
             .
 
       # Step 8: Push Docker image to Artifact Registry
-      # REASON: Use dynamic service_name from deployment_target step
+      # REASON: Use dynamic service_name and version
       - name: Push Docker image
         run: |
-          echo "📦 Pushing Docker image with version ${{ steps.tag_version.outputs.new_tag }} to Artifact Registry..."
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ steps.tag_version.outputs.new_tag }}
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag || github.sha }}"
+          echo "📦 Pushing Docker image with version $VERSION_TAG to Artifact Registry..."
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:$VERSION_TAG
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:latest
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ github.sha }}
 
       # Step 9: Deploy to Cloud Run
-      # REASON: Use dynamic service_name and env_name from deployment_target step
+      # REASON: Use dynamic service_name, env_name, and version
       # OLD: Always deployed to subtribe-ats-api-dev with ENVIRONMENT=development
-      # NEW: Deploys to dev or prod based on commit message prefix
+      # NEW: Deploys to dev or prod based on branch
       - name: Deploy to Cloud Run
         run: |
-          echo "🚀 Deploying version ${{ steps.tag_version.outputs.new_tag }} to Cloud Run..."
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag || github.sha }}"
+          echo "🚀 Deploying version $VERSION_TAG to Cloud Run..."
           echo "🎯 Service: ${{ steps.deployment_target.outputs.service_name }}"
           echo "🌍 Environment: ${{ steps.deployment_target.outputs.env_name }}"
           gcloud run deploy ${{ steps.deployment_target.outputs.service_name }} \
-            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ steps.tag_version.outputs.new_tag }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:$VERSION_TAG \
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
@@ -228,9 +236,10 @@ jobs:
             --min-instances=0
 
       # Step 10: Get service URL
-      # REASON: Use dynamic service_name from deployment_target step
+      # REASON: Use dynamic service_name and version
       - name: Get service URL
         run: |
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag || github.sha }}"
           SERVICE_URL=$(gcloud run services describe ${{ steps.deployment_target.outputs.service_name }} \
             --region=${{ env.REGION }} \
             --format='value(status.url)')
@@ -238,7 +247,7 @@ jobs:
           echo "🌐 Service URL: $SERVICE_URL"
           echo "🎯 Service: ${{ steps.deployment_target.outputs.service_name }}"
           echo "🌍 Environment: ${{ steps.deployment_target.outputs.env_name }}"
-          echo "📦 Version: ${{ steps.tag_version.outputs.new_tag }}"
+          echo "📦 Version: $VERSION_TAG"
           echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
 
       # Step 11: Run smoke test
