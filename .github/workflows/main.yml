@@ -14,7 +14,11 @@ env:
   # GCP Configuration
   PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   REGION: asia-south1  # Mumbai region
-  SERVICE_NAME: subtribe-ats-api-dev
+  # OLD: SERVICE_NAME: subtribe-ats-api-dev
+  # REASON: SERVICE_NAME is now dynamic (determined per-deployment in the job)
+  # - Main branch → subtribe-ats-api-prod (production)
+  # - Feature branches with "push-" commits → subtribe-ats-api-dev (development)
+  # Value is set in steps.deployment_target.outputs.service_name
   IMAGE_NAME: subtribe-ats-backend
 
 jobs:
@@ -109,7 +113,9 @@ jobs:
     name: Build & Deploy to Cloud Run
     runs-on: ubuntu-latest
     needs: lint-test  # Wait for lint-test to pass
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'  # Deploy on push to main OR manual trigger
+    # OLD: if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    # REASON: Now supports deployment from any branch (if commit starts with "push-") OR main branch
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.event.head_commit.message, 'push-')))
     
     steps:
       # Step 1: Checkout code
@@ -118,7 +124,34 @@ jobs:
         with:
           fetch-depth: 0  # Fetch all history for versioning
 
-      # Step 2: Bump version and create tag
+      # Step 2: Detect deployment target (development vs production)
+      # REASON: Support branch-based deployment
+      # - Main branch → PRODUCTION (subtribe-ats-api-prod)
+      # - Any branch with commit starting with "push-" → DEVELOPMENT (subtribe-ats-api-dev)
+      - name: Detect deployment target
+        id: deployment_target
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "📝 Branch: $BRANCH_NAME"
+          echo "📝 Commit message: $COMMIT_MSG"
+
+          if [[ "$BRANCH_NAME" == "main" ]]; then
+            echo "🚀 PRODUCTION deployment (main branch)"
+            echo "target_env=production" >> $GITHUB_OUTPUT
+            echo "service_name=subtribe-ats-api-prod" >> $GITHUB_OUTPUT
+            echo "env_name=production" >> $GITHUB_OUTPUT
+          else
+            echo "🔧 DEVELOPMENT deployment (feature branch with 'push-' prefix)"
+            echo "target_env=development" >> $GITHUB_OUTPUT
+            echo "service_name=subtribe-ats-api-dev" >> $GITHUB_OUTPUT
+            echo "env_name=development" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Environment: ${{ steps.deployment_target.outputs.env_name }}"
+          echo "Service: ${{ steps.deployment_target.outputs.service_name }}"
+
+      # Step 3: Bump version and create tag
       - name: Bump version and push tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
@@ -152,33 +185,41 @@ jobs:
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
       # Step 7: Build Docker image with version tags
+      # REASON: Use dynamic service_name from deployment_target step
       - name: Build Docker image
         run: |
           echo "🔨 Building Docker image version ${{ steps.tag_version.outputs.new_tag }}..."
+          echo "🎯 Target: ${{ steps.deployment_target.outputs.service_name }}"
           docker build \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.tag_version.outputs.new_tag }} \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:latest \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ steps.tag_version.outputs.new_tag }} \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:latest \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ github.sha }} \
             .
 
       # Step 8: Push Docker image to Artifact Registry
+      # REASON: Use dynamic service_name from deployment_target step
       - name: Push Docker image
         run: |
           echo "📦 Pushing Docker image with version ${{ steps.tag_version.outputs.new_tag }} to Artifact Registry..."
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.tag_version.outputs.new_tag }}
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:latest
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ steps.tag_version.outputs.new_tag }}
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:latest
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ github.sha }}
 
       # Step 9: Deploy to Cloud Run
+      # REASON: Use dynamic service_name and env_name from deployment_target step
+      # OLD: Always deployed to subtribe-ats-api-dev with ENVIRONMENT=development
+      # NEW: Deploys to dev or prod based on commit message prefix
       - name: Deploy to Cloud Run
         run: |
           echo "🚀 Deploying version ${{ steps.tag_version.outputs.new_tag }} to Cloud Run..."
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.tag_version.outputs.new_tag }} \
+          echo "🎯 Service: ${{ steps.deployment_target.outputs.service_name }}"
+          echo "🌍 Environment: ${{ steps.deployment_target.outputs.env_name }}"
+          gcloud run deploy ${{ steps.deployment_target.outputs.service_name }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ steps.tag_version.outputs.new_tag }} \
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --set-env-vars="ENVIRONMENT=development,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=HS256,JWT_EXPIRY_DAYS=15,REFRESH_TOKEN_EXPIRY_DAYS=30,SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }}" \
+            --set-env-vars="ENVIRONMENT=${{ steps.deployment_target.outputs.env_name }},DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=HS256,JWT_EXPIRY_DAYS=15,REFRESH_TOKEN_EXPIRY_DAYS=30,SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }}" \
             --service-account=github-actions@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --memory=512Mi \
             --cpu=1 \
@@ -187,20 +228,24 @@ jobs:
             --min-instances=0
 
       # Step 10: Get service URL
+      # REASON: Use dynamic service_name from deployment_target step
       - name: Get service URL
         run: |
-          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+          SERVICE_URL=$(gcloud run services describe ${{ steps.deployment_target.outputs.service_name }} \
             --region=${{ env.REGION }} \
             --format='value(status.url)')
           echo "✅ Deployment successful!"
           echo "🌐 Service URL: $SERVICE_URL"
+          echo "🎯 Service: ${{ steps.deployment_target.outputs.service_name }}"
+          echo "🌍 Environment: ${{ steps.deployment_target.outputs.env_name }}"
           echo "📦 Version: ${{ steps.tag_version.outputs.new_tag }}"
           echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
 
       # Step 11: Run smoke test
+      # REASON: Use dynamic service_name from deployment_target step
       - name: Smoke test
         run: |
-          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+          SERVICE_URL=$(gcloud run services describe ${{ steps.deployment_target.outputs.service_name }} \
             --region=${{ env.REGION }} \
             --format='value(status.url)')
           echo "🔍 Running smoke test..."

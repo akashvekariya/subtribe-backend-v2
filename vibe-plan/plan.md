@@ -371,6 +371,59 @@ GET /applications/{id}/resume
 
 **Checkpoint**: App running in production
 
+### Production Deployment Checklist (Before True Prod)
+
+**Current Setup** (as of 2025-10-30):
+- Development: Any branch + commit starting with `push-` → deploys to `subtribe-ats-api-dev`
+- Production: Merge to `main` branch → deploys to `subtribe-ats-api-prod`
+- Both use same secrets/variables (DATABASE_URL, SUPABASE_URL, etc.)
+- Both create version tags on deployment
+
+**⚠️ Before deploying to REAL production, you MUST:**
+
+1. **Separate Secrets/Variables in GitHub**
+   - Create production-specific secrets with `-PROD` suffix:
+     - `DATABASE_URL_PROD` (production Supabase database)
+     - `SUPABASE_URL_PROD`, `SUPABASE_SERVICE_KEY_PROD`, etc.
+     - `GCS_BUCKET_NAME_PROD` (separate GCS bucket for prod resumes)
+   - Update workflow to use conditional secrets based on environment:
+     ```yaml
+     DATABASE_URL=${{ steps.deployment_target.outputs.env_name == 'production' && secrets.DATABASE_URL_PROD || secrets.DATABASE_URL }}
+     ```
+
+2. **Database Migration Strategy**
+   - Run migrations on production database BEFORE deployment
+   - Use separate migration tracking (Alembic keeps versions per-database)
+   - Test migrations on staging copy of prod database first
+
+3. **GCS Bucket Separation**
+   - Create separate production GCS bucket (`subtribe-ats-resumes-prod`)
+   - Set up proper IAM permissions for prod service account
+   - Update production environment variables
+
+4. **Monitoring & Logging**
+   - Set up production error tracking (Sentry, Datadog, etc.)
+   - Configure production log retention in GCP
+   - Add alerting for production failures
+
+5. **Production Service Configuration**
+   - Increase Cloud Run resources (memory: 1Gi, cpu: 2)
+   - Set `min-instances=1` (keep warm, no cold starts)
+   - Set `max-instances=10` (handle traffic spikes)
+   - Enable Cloud Armor for DDoS protection (optional)
+
+6. **Deployment Safety**
+   - Add GitHub Environment protection rules for production
+   - Require manual approval for production deployments
+   - Add deployment notifications (Slack, email)
+
+7. **Backup & Recovery**
+   - Set up automated database backups (Supabase handles this)
+   - Document rollback procedure (redeploy previous version tag)
+   - Keep production `.env` backup in secure location
+
+**Current Status**: Using same environment for dev/prod testing. Safe for MVP pilot, NOT for real production with customer data.
+
 ---
 
 ## Phase 10: Pilot Launch (Day 13-14)

@@ -218,3 +218,6 @@ __marimo__/
 
 # Secrets
 **secrets/
+
+# MacOS
+**/.DS_Store

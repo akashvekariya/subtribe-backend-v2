@@ -21,6 +21,7 @@ from app.schemas.application import (
 from app.schemas.common import PaginationMeta
 from app.schemas.job import (
     JobCreate,
+    JobListItem,
     JobListResponse,
     JobResponse,
     JobUpdate,
@@ -163,21 +164,43 @@ async def list_jobs(
     pages = (total + limit - 1) // limit  # Ceiling division
     offset = (page - 1) * limit
 
-    # Get paginated jobs (excluding soft-deleted)
+    # Get paginated jobs with applications_count (excluding soft-deleted)
     stmt = (
-        select(Job)
+        select(Job, func.count(Application.id).label("applications_count"))
+        .outerjoin(Application, (Application.job_id == Job.id) & (Application.deleted_at.is_(None)))
         .where(Job.company_id == current_user["company_id"], Job.deleted_at.is_(None))
         .options(selectinload(Job.creator))
+        .group_by(Job.id)
         .order_by(Job.created_at.desc())
         .offset(offset)
         .limit(limit)
     )
 
     result = await db.execute(stmt)
-    jobs = result.scalars().all()
+    jobs_with_counts = []
+    for row in result:
+        job = row[0]
+        app_count = row[1]
+
+        # Convert Job model to dict and add applications_count
+        job_dict = {
+            "id": job.id,
+            "title": job.title,
+            "slug": job.slug,
+            "status": job.status,
+            "position_type": job.position_type,
+            "location_type": job.location_type,
+            "views_count": job.views_count,
+            "applications_count": app_count,
+            "created_by": job.created_by,
+            "creator": job.creator,
+            "published_at": job.published_at,
+            "created_at": job.created_at,
+        }
+        jobs_with_counts.append(JobListItem(**job_dict))
 
     return JobListResponse(
-        data=jobs,
+        data=jobs_with_counts,
         pagination=PaginationMeta(
             page=page,
             limit=limit,

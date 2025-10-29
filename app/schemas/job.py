@@ -199,6 +199,7 @@ class JobListItem(BaseModel):
     position_type: str | None = None
     location_type: str | None = None
     views_count: int
+    applications_count: int
 
     created_by: UUID
     creator: JobCreatorResponse | None = None
