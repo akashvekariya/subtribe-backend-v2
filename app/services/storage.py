@@ -7,6 +7,7 @@ import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import BinaryIO
 
+from google import auth
 from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError
 from google.oauth2 import service_account
@@ -23,18 +24,28 @@ class StorageService:
         """Initialize GCS client with service account credentials."""
         creds_path = settings.google_application_credentials
 
-        # Load service account credentials from file
-        # This is required for generate_signed_url() to work
+        # Load credentials - try file first, then fall back to ADC
         self._credentials = None
+
+        # Try loading from file (local development)
         if creds_path and creds_path != "/dev/null" and os.path.exists(creds_path):
             try:
                 self._credentials = service_account.Credentials.from_service_account_file(
                     creds_path, scopes=["https://www.googleapis.com/auth/cloud-platform"]
                 )
+                logger.info("Loaded service account credentials from file")
             except Exception as e:
-                # In test environment, credentials may be fake - log and continue
-                logger.warning(f"Could not load service account credentials: {e}")
-                self._credentials = None
+                logger.warning(f"Could not load credentials from file: {e}")
+
+        # If no file credentials, use Application Default Credentials (Cloud Run)
+        if self._credentials is None:
+            try:
+                self._credentials, _ = auth.default(
+                    scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                )
+                logger.info("Using Application Default Credentials (Cloud Run)")
+            except Exception as e:
+                logger.warning(f"Could not load default credentials: {e}")
 
         self._client: storage.Client | None = None
         self._bucket: storage.Bucket | None = None
