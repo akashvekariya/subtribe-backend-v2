@@ -25,12 +25,16 @@ class StorageService:
 
         # Load service account credentials from file
         # This is required for generate_signed_url() to work
+        self._credentials = None
         if creds_path and creds_path != "/dev/null" and os.path.exists(creds_path):
-            self._credentials = service_account.Credentials.from_service_account_file(
-                creds_path, scopes=["https://www.googleapis.com/auth/cloud-platform"]
-            )
-        else:
-            self._credentials = None
+            try:
+                self._credentials = service_account.Credentials.from_service_account_file(
+                    creds_path, scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                )
+            except Exception as e:
+                # In test environment, credentials may be fake - log and continue
+                logger.warning(f"Could not load service account credentials: {e}")
+                self._credentials = None
 
         self._client: storage.Client | None = None
         self._bucket: storage.Bucket | None = None
