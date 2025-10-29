@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import TIMESTAMP, CheckConstraint, ForeignKey, Integer, String, Text, text
+from sqlalchemy import TIMESTAMP, CheckConstraint, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -106,13 +106,18 @@ class Application(Base):
         "ApplicationStatusHistory", back_populates="application", cascade="all, delete-orphan"
     )
 
-    # Constraints
+    # Constraints & Indexes
     __table_args__ = (
         CheckConstraint(
             "status IN ('applied', 'screening', 'interviewing', 'offer', 'hired', 'rejected')",
             name="valid_application_status",
         ),
+        # Performance index for GET /jobs/{job_id}/applications endpoint
+        Index("idx_applications_job_applied", "job_id", "applied_at"),
+        # Composite index for status filtering (common recruiter workflow)
+        Index("idx_applications_job_status_applied", "job_id", "status", "applied_at"),
     )
 
     def __repr__(self) -> str:
-        return f"<Application(id={self.id}, name={self.first_name} {self.last_name}, status={self.status})>"
+        name = f"{self.first_name} {self.last_name}"
+        return f"<Application(id={self.id}, name={name}, status={self.status})>"

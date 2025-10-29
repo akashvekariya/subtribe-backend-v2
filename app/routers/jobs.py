@@ -18,12 +18,12 @@ from app.schemas.application import (
     ApplicationListItem,
     ApplicationListResponse,
 )
+from app.schemas.common import PaginationMeta
 from app.schemas.job import (
     JobCreate,
     JobListResponse,
     JobResponse,
     JobUpdate,
-    PaginationMeta,
     PublicJobResponse,
 )
 
@@ -150,9 +150,11 @@ async def list_jobs(
     - Multi-tenant filtered by company_id
     - Paginated with metadata
     """
-    # Count total jobs
+    # Count total jobs (excluding soft-deleted)
     count_stmt = (
-        select(func.count()).select_from(Job).where(Job.company_id == current_user["company_id"])
+        select(func.count())
+        .select_from(Job)
+        .where(Job.company_id == current_user["company_id"], Job.deleted_at.is_(None))
     )
     total_result = await db.execute(count_stmt)
     total = total_result.scalar_one()
@@ -161,10 +163,10 @@ async def list_jobs(
     pages = (total + limit - 1) // limit  # Ceiling division
     offset = (page - 1) * limit
 
-    # Get paginated jobs
+    # Get paginated jobs (excluding soft-deleted)
     stmt = (
         select(Job)
-        .where(Job.company_id == current_user["company_id"])
+        .where(Job.company_id == current_user["company_id"], Job.deleted_at.is_(None))
         .options(selectinload(Job.creator))
         .order_by(Job.created_at.desc())
         .offset(offset)
@@ -180,7 +182,7 @@ async def list_jobs(
             page=page,
             limit=limit,
             total=total,
-            pages=pages,
+            total_pages=pages,
             has_more=page < pages,
         ),
     )
@@ -328,8 +330,10 @@ async def list_job_applications(
     if not job:
         raise NotFoundError(message="Job not found", code="job_not_found")
 
-    # 2. Build query
-    query = select(Application).where(Application.job_id == job_id)
+    # 2. Build query (excluding soft-deleted)
+    query = select(Application).where(
+        Application.job_id == job_id, Application.deleted_at.is_(None)
+    )
 
     if status_filter:
         query = query.where(Application.status == status_filter)
@@ -337,8 +341,12 @@ async def list_job_applications(
     # Order by most recent first
     query = query.order_by(Application.applied_at.desc())
 
-    # 3. Get total count
-    count_query = select(func.count()).select_from(Application).where(Application.job_id == job_id)
+    # 3. Get total count (excluding soft-deleted)
+    count_query = (
+        select(func.count())
+        .select_from(Application)
+        .where(Application.job_id == job_id, Application.deleted_at.is_(None))
+    )
     if status_filter:
         count_query = count_query.where(Application.status == status_filter)
 

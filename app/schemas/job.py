@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.common import PaginationMeta
+
 # ============================================================================
 # Request Schemas
 # ============================================================================
@@ -203,16 +205,6 @@ class JobListItem(BaseModel):
 
     published_at: datetime | None = None
     created_at: datetime
-
-
-class PaginationMeta(BaseModel):
-    """Pagination metadata."""
-
-    page: int
-    limit: int
-    total: int
-    pages: int
-    has_more: bool
 
 
 class JobListResponse(BaseModel):

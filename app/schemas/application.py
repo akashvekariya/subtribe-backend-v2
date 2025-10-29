@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, field_validator
 
+from app.schemas.common import PaginationMeta
+
 # ============================================================================
 # Request Schemas
 # ============================================================================
@@ -153,16 +155,6 @@ class ResumeUrl(BaseModel):
     url: str
     filename: str
     expires_at: datetime
-
-
-class PaginationMeta(BaseModel):
-    """Pagination metadata."""
-
-    page: int
-    limit: int
-    total: int
-    total_pages: int
-    has_more: bool
 
 
 class ApplicationListResponse(BaseModel):

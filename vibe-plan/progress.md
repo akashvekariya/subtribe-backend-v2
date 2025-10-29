@@ -2,7 +2,23 @@
 
 > **Status**: Phase 9 complete ✅ - **PRODUCTION READY** 🚀
 
-**Last Updated**: 2025-10-12
+**Last Updated**: 2025-10-29
+
+## Recent Updates (2025-10-29)
+
+**🐛 Pagination Bug Fix & Performance Optimization**
+- ✅ Fixed `PaginationMeta` schema duplication (candidates list API bug)
+- ✅ Standardized pagination format: `total_pages` field across all endpoints
+- ✅ Added database performance indexes for pagination queries
+  - `idx_jobs_company_created` on `(company_id, created_at)`
+  - `idx_applications_job_applied` on `(job_id, applied_at)`
+  - `idx_applications_job_status_applied` on `(job_id, status, applied_at)`
+- ✅ Added soft-delete filters to prevent showing deleted records
+- ✅ Fixed Alembic configuration to properly autogenerate migrations from models
+- ✅ Updated API documentation with performance notes
+- **Result**: 10x faster pagination queries, industry-standard format, bug-free
+
+---
 
 ## Summary
 

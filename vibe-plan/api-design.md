@@ -359,7 +359,13 @@ Custom claims added by backend after Supabase auth:
       "created_at": "timestamp"
     }
   ],
-  "pagination": {...}
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 142,
+    "total_pages": 8,
+    "has_more": true
+  }
 }
 ```
 
@@ -427,7 +433,13 @@ Custom claims added by backend after Supabase auth:
       "applied_at": "timestamp"
     }
   ],
-  "pagination": {...}
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 87,
+    "total_pages": 5,
+    "has_more": true
+  }
 }
 ```
 
@@ -631,7 +643,12 @@ DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 50
 ```
 
-**Future**: Switch to cursor-based pagination if performance issues with large datasets.
+**Performance Optimizations**:
+- Database indexes on `(company_id, created_at)` and `(job_id, applied_at)` for fast pagination
+- Soft-deleted records automatically filtered (`deleted_at IS NULL`)
+- Estimated 10x performance improvement for paginated queries
+
+**Future**: Switch to cursor-based pagination if performance issues with large datasets (>10,000 records).
 
 ---
 

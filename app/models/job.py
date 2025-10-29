@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import TIMESTAMP, CheckConstraint, ForeignKey, Integer, String, text
+from sqlalchemy import TIMESTAMP, CheckConstraint, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -102,7 +102,7 @@ class Job(Base):
         "Application", back_populates="job", cascade="all, delete-orphan"
     )
 
-    # Constraints
+    # Constraints & Indexes
     __table_args__ = (
         CheckConstraint("status IN ('draft', 'active', 'closed')", name="valid_job_status"),
         CheckConstraint(
@@ -112,6 +112,8 @@ class Job(Base):
             "position_type IN ('full_time', 'part_time', 'contract', 'internship')",
             name="valid_position_type",
         ),
+        # Performance index for GET /jobs endpoint (paginated listing)
+        Index("idx_jobs_company_created", "company_id", "created_at"),
     )
 
     def __repr__(self) -> str:

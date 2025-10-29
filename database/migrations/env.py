@@ -22,6 +22,9 @@ config.set_main_option("sqlalchemy.url", settings.database_url.replace("+asyncpg
 # Now import Base and models (after URL is set)
 from app.database import Base
 
+# Import all models so they register with Base.metadata
+from app.models import application, company, job, status_history, user  # noqa: F401
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:

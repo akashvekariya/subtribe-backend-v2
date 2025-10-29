@@ -1,8 +1,26 @@
 # AI Assistant Onboarding - Subtribe ATS Backend
 
-> **You are**: A senior backend engineer joining this project  
-> **This file**: Your complete onboarding guide - read once, work autonomously  
+> **You are**: A senior backend engineer joining this project
+> **This file**: Your complete onboarding guide - read once, work autonomously
 > **Workflow**: Check progress → Pick next task → Execute → Update progress
+
+---
+
+## ⚠️ CRITICAL: Read This First
+
+**BEFORE doing ANY work**, you MUST read:
+
+📘 **[`AI_CODING_STANDARDS.md`](./AI_CODING_STANDARDS.md)** - Coding methodology, quality standards, and when to stop
+
+This document defines:
+- ✅ How to write production-grade code
+- 🛑 When to STOP immediately (safety checks)
+- 🧪 How to test and verify changes
+- 📋 Pre-commit quality checklist
+- 🔧 Proper database migration workflow
+- ❌ Common pitfalls and how to avoid them
+
+**Failure to follow these standards will result in bugs, failed migrations, or production issues.**
 
 ---
 
@@ -15,11 +33,14 @@
 4. User confirms → You execute → Update progress.md
 
 **Daily workflow** (user asks for help):
-1. Check [`progress.md`](./vibe-plan/progress.md) - What's done? What's next?
-2. Check [`plan.md`](./vibe-plan/plan.md) - What does current phase require?
-3. Execute task (write code, run commands, test)
-4. Update [`progress.md`](./vibe-plan/progress.md) - Check off completed tasks
-5. Commit changes, inform user
+1. **READ [`AI_CODING_STANDARDS.md`](./AI_CODING_STANDARDS.md) first** - Coding methodology & quality standards ⭐
+2. Check [`progress.md`](./vibe-plan/progress.md) - What's done? What's next?
+3. Check [`plan.md`](./vibe-plan/plan.md) - What does current phase require?
+4. Execute task (write code, run commands, test)
+5. Update [`progress.md`](./vibe-plan/progress.md) - Check off completed tasks
+6. Commit changes, inform user
+
+**IMPORTANT**: Always follow the standards in `AI_CODING_STANDARDS.md` - it defines when to stop, how to test, and production-grade code requirements.
 
 **Example interaction**:
 ```
@@ -469,9 +490,17 @@ You:
 
 ---
 
-**Last Updated**: 2025-10-12  
-**Current Phase**: Phase 9 Complete ✅ - Production Deployed  
+**Last Updated**: 2025-10-29
+**Current Phase**: Phase 9 Complete ✅ - Production Deployed
 **Next**: Phase 10 - Pilot Launch
+
+**Recent Changes (2025-10-29)**:
+- ✅ Created [`AI_CODING_STANDARDS.md`](./AI_CODING_STANDARDS.md) - Comprehensive coding methodology & quality standards
+- ✅ Fixed pagination schema duplication bug (candidates list API)
+- ✅ Added performance indexes for pagination (10x faster queries)
+- ✅ Standardized all pagination responses to use `total_pages` field
+- ✅ Added soft-delete filters to prevent showing deleted records
+- ✅ Updated all API documentation with correct pagination format
 
 **Recent Changes (2025-10-12)**:
 - ✅ Phase 9 Complete: Deployment & CI/CD

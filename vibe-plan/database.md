@@ -210,6 +210,9 @@ CREATE INDEX idx_jobs_created_by ON jobs(created_by);
 CREATE INDEX idx_jobs_status ON jobs(status);
 CREATE INDEX idx_jobs_slug ON jobs(slug);
 CREATE INDEX idx_jobs_published_at ON jobs(published_at);
+
+-- Performance index for paginated job listings
+CREATE INDEX idx_jobs_company_created ON jobs(company_id, created_at);
 ```
 
 **Screening Questions JSONB**: Array of question objects with `{id, question, type, required, order, options?}`  
@@ -274,6 +277,10 @@ CREATE INDEX idx_applications_company_id ON applications(company_id);
 CREATE INDEX idx_applications_email ON applications(email);
 CREATE INDEX idx_applications_status ON applications(status);
 CREATE INDEX idx_applications_applied_at ON applications(applied_at DESC);
+
+-- Performance indexes for paginated candidate listings
+CREATE INDEX idx_applications_job_applied ON applications(job_id, applied_at);
+CREATE INDEX idx_applications_job_status_applied ON applications(job_id, status, applied_at);
 ```
 
 **Screening Answers JSONB**: Key-value pairs matching job's screening questions (e.g., `{"q1": "120000", "q2": "..."}`)
