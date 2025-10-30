@@ -57,6 +57,18 @@ class Job(Base):
     salary_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
     salary_currency: Mapped[str] = mapped_column(String(10), nullable=True)
 
+    # Experience Requirements
+    min_experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Skills & Requirements
+    required_skills: Mapped[list] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb"), default=list, nullable=False
+    )
+    preferred_skills: Mapped[list] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb"), default=list, nullable=False
+    )
+
     # Screening Questions
     screening_questions: Mapped[list] = mapped_column(
         JSONB, server_default=text("'[]'::jsonb"), default=list, nullable=False

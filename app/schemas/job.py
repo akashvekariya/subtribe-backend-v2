@@ -40,6 +40,19 @@ class JobCreate(BaseModel):
     salary_max: int | None = Field(None, ge=0, description="Maximum salary")
     salary_currency: str | None = Field("INR", max_length=10, description="Default: INR")
 
+    # Experience (optional)
+    min_experience_years: int | None = Field(None, ge=0, description="Minimum years of experience")
+    max_experience_years: int | None = Field(None, ge=0, description="Maximum years of experience")
+
+    # Skills (optional)
+    required_skills: list[str] = Field(default_factory=list, description="Required skills")
+    preferred_skills: list[str] = Field(default_factory=list, description="Nice-to-have skills")
+
+    # Screening Questions (optional)
+    screening_questions: list[dict] = Field(
+        default_factory=list, description="Custom screening questions for candidates"
+    )
+
     # Status (optional, defaults to draft)
     status: str | None = Field("draft", description="draft | active | closed")
 
@@ -85,6 +98,14 @@ class JobUpdate(BaseModel):
     salary_min: int | None = Field(None, ge=0)
     salary_max: int | None = Field(None, ge=0)
     salary_currency: str | None = Field(None, max_length=10)
+
+    min_experience_years: int | None = Field(None, ge=0)
+    max_experience_years: int | None = Field(None, ge=0)
+
+    required_skills: list[str] | None = None
+    preferred_skills: list[str] | None = None
+
+    screening_questions: list[dict] | None = None
 
     status: str | None = None
 
@@ -174,6 +195,14 @@ class JobResponse(BaseModel):
     salary_max: int | None = None
     salary_currency: str | None = None
 
+    min_experience_years: int | None = None
+    max_experience_years: int | None = None
+
+    required_skills: list[str] = Field(default_factory=list)
+    preferred_skills: list[str] = Field(default_factory=list)
+
+    screening_questions: list[dict] = Field(default_factory=list)
+
     status: str
     slug: str
     views_count: int
@@ -237,6 +266,14 @@ class PublicJobResponse(BaseModel):
     salary_min: int | None = None
     salary_max: int | None = None
     salary_currency: str | None = None
+
+    min_experience_years: int | None = None
+    max_experience_years: int | None = None
+
+    required_skills: list[str] = Field(default_factory=list)
+    preferred_skills: list[str] = Field(default_factory=list)
+
+    screening_questions: list[dict] = Field(default_factory=list)
 
     status: str
     views_count: int
