@@ -9,6 +9,7 @@ from typing import BinaryIO
 
 from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError
+from google.oauth2 import service_account
 
 from app.config import settings
 
@@ -22,31 +23,47 @@ class StorageService:
         """Initialize GCS client and bucket.
 
         Authentication:
-        - Local: Uses service account key file via GOOGLE_APPLICATION_CREDENTIALS
-        - Cloud Run: Uses Application Default Credentials (attached service account)
-
-        For signed URL generation on Cloud Run, the service account must have:
-        - roles/iam.serviceAccountTokenCreator (for IAM-based signing without private key)
+        - Uses service account key file for ALL operations (upload + signed URLs)
+        - Key file must have Storage Object Admin + Storage Object Creator roles
         """
-        # Set GCS credentials from environment (skip if /dev/null or doesn't exist)
-        # In Cloud Run, credentials come from the service account automatically (ADC)
-        creds_path = settings.google_application_credentials
-        if creds_path and creds_path != "/dev/null" and os.path.exists(creds_path):
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
-
         self._client: storage.Client | None = None
         self._bucket: storage.Bucket | None = None
+        self._signing_credentials: service_account.Credentials | None = None
+
+    def _get_credentials(self) -> service_account.Credentials:
+        """Load service account credentials from key file.
+
+        Returns:
+            Service account credentials with private key for signing
+        """
+        if self._signing_credentials is None:
+            creds_path = settings.google_application_credentials
+
+            # Check if credentials path exists and is valid
+            if not creds_path or creds_path == "/dev/null" or not os.path.exists(creds_path):
+                raise ValueError(
+                    f"Invalid or missing service account key file: {creds_path}. "
+                    "Set GOOGLE_APPLICATION_CREDENTIALS to valid JSON key file path."
+                )
+
+            # Load service account credentials from JSON key file
+            self._signing_credentials = service_account.Credentials.from_service_account_file(
+                creds_path,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            )
+            logger.info(f"Loaded service account credentials from: {creds_path}")
+
+        return self._signing_credentials
 
     @property
     def client(self) -> storage.Client:
-        """Lazy-load GCS client.
-
-        Uses Application Default Credentials which automatically discovers credentials from:
-        - GOOGLE_APPLICATION_CREDENTIALS env var (local development with key file)
-        - Metadata server (Cloud Run with attached service account)
-        """
+        """Lazy-load GCS client with service account credentials."""
         if self._client is None:
-            self._client = storage.Client(project=settings.gcs_project_id)
+            credentials = self._get_credentials()
+            self._client = storage.Client(
+                project=settings.gcs_project_id,
+                credentials=credentials,
+            )
         return self._client
 
     @property
@@ -169,9 +186,8 @@ class StorageService:
         """
         Generate temporary signed URL for accessing file.
 
-        Works in both environments:
-        - Local: Uses service account key file (private key signing)
-        - Cloud Run: Uses IAM signBlob API (requires roles/iam.serviceAccountTokenCreator)
+        Uses service account credentials with private key for signing.
+        Works in both local and Cloud Run environments (requires key file).
 
         Args:
             gcs_uri: GCS URI (gs://bucket/path/to/file.pdf)
@@ -190,73 +206,22 @@ class StorageService:
             blob = self.bucket.blob(path)
             filename = path.split("/")[-1]
 
-            # Get credentials to determine signing method
-            client_creds = self.client._credentials
+            # Generate signed URL using service account private key
+            url = blob.generate_signed_url(
+                version="v4",
+                expiration=timedelta(minutes=expiration_minutes),
+                method="GET",
+                response_disposition=f'{disposition}; filename="{filename}"',
+                credentials=self._get_credentials(),
+            )
 
-            # Check if credentials have signing capability (private key)
-            has_private_key = hasattr(client_creds, "sign_bytes")
-
-            if has_private_key:
-                # Local: Use private key signing (service account key file)
-                url = blob.generate_signed_url(
-                    version="v4",
-                    expiration=timedelta(minutes=expiration_minutes),
-                    method="GET",
-                    response_disposition=f'{disposition}; filename="{filename}"',
-                )
-                logger.info(f"Generated signed URL using private key for: {path}")
-            else:
-                # Cloud Run: Use IAM signBlob API
-                # When service_account_email is provided without access_token,
-                # the library uses IAM Credentials API to sign the blob
-
-                # Get service account email from the running environment
-                # This is set via --service-account in Cloud Run deployment
-                if (
-                    hasattr(client_creds, "service_account_email")
-                    and client_creds.service_account_email
-                ):
-                    service_account_email = client_creds.service_account_email
-                else:
-                    # Fallback: Fetch from metadata server (Cloud Run/GCE)
-                    try:
-                        import requests as http_requests
-
-                        resp = http_requests.get(
-                            "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email",
-                            headers={"Metadata-Flavor": "Google"},
-                            timeout=2,
-                        )
-                        service_account_email = resp.text.strip()
-                    except Exception as e:
-                        logger.error(f"Failed to get service account email: {e}")
-                        raise GoogleCloudError(
-                            "Unable to determine service account for signing"
-                        ) from e
-
-                # Generate signed URL using IAM signing
-                # Library automatically calls IAM signBlob API when:
-                # 1. service_account_email is provided
-                # 2. credentials don't have private key (compute credentials)
-                # 3. Service account has iam.serviceAccountTokenCreator permission
-                url = blob.generate_signed_url(
-                    version="v4",
-                    expiration=timedelta(minutes=expiration_minutes),
-                    method="GET",
-                    response_disposition=f'{disposition}; filename="{filename}"',
-                    service_account_email=service_account_email,
-                )
-                logger.info(
-                    f"Generated signed URL using IAM signBlob API for: {path} | SA: {service_account_email}"
-                )
-
+            logger.info(f"Generated signed URL for: {path} (expires in {expiration_minutes}m)")
             return url
 
         except Exception as e:
-            # Single-line structured logging for better debugging
             error_msg = str(e).replace("\n", " ").replace("  ", " ")
             logger.error(
-                f"Failed to generate signed URL | Path: {path} | Error: {error_msg}",
+                f"Failed to generate signed URL | Path: {path if 'path' in locals() else gcs_uri} | Error: {error_msg}",
                 exc_info=True,
             )
             raise GoogleCloudError(f"Failed to generate download URL: {str(e)}") from e

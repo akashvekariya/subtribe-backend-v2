@@ -103,7 +103,15 @@ gcloud iam service-accounts keys create ~/subtribe-ats-storage-key.json \
   --iam-account=$SA_EMAIL
 
 chmod 600 ~/subtribe-ats-storage-key.json
+
+# Upload key to Secret Manager (required for Cloud Run signed URLs)
+gcloud secrets create gcs-credentials --data-file=~/subtribe-ats-storage-key.json
+gcloud secrets add-iam-policy-binding gcs-credentials \
+  --member="serviceAccount:$SA_EMAIL" \
+  --role="roles/secretmanager.secretAccessor"
 ```
+
+**Why Secret Manager?** Signed URLs require private key (not just token). Cloud Run mounts the key from Secret Manager at `/tmp/gcs-key.json`. Configured in `.github/workflows/main.yml:232`.
 
 **Service Account Usage:**
 - `subtribe-ats-storage` runs the application on Cloud Run
