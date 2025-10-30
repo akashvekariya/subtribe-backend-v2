@@ -7,10 +7,8 @@ import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import BinaryIO
 
-from google import auth
 from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError
-from google.oauth2 import service_account
 
 from app.config import settings
 
@@ -21,42 +19,21 @@ class StorageService:
     """Service for managing file uploads to Google Cloud Storage."""
 
     def __init__(self):
-        """Initialize GCS client with service account credentials."""
+        """Initialize GCS client and bucket."""
+        # Set GCS credentials from environment (skip if /dev/null or doesn't exist)
+        # In Cloud Run, credentials come from the service account automatically (ADC)
         creds_path = settings.google_application_credentials
-
-        # Load credentials - try file first, then fall back to ADC
-        self._credentials = None
-
-        # Try loading from file (local development)
         if creds_path and creds_path != "/dev/null" and os.path.exists(creds_path):
-            try:
-                self._credentials = service_account.Credentials.from_service_account_file(
-                    creds_path, scopes=["https://www.googleapis.com/auth/cloud-platform"]
-                )
-                logger.info("Loaded service account credentials from file")
-            except Exception as e:
-                logger.warning(f"Could not load credentials from file: {e}")
-
-        # If no file credentials, use Application Default Credentials (Cloud Run)
-        if self._credentials is None:
-            try:
-                self._credentials, _ = auth.default(
-                    scopes=["https://www.googleapis.com/auth/cloud-platform"]
-                )
-                logger.info("Using Application Default Credentials (Cloud Run)")
-            except Exception as e:
-                logger.warning(f"Could not load default credentials: {e}")
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
 
         self._client: storage.Client | None = None
         self._bucket: storage.Bucket | None = None
 
     @property
     def client(self) -> storage.Client:
-        """Lazy-load GCS client with credentials."""
+        """Lazy-load GCS client."""
         if self._client is None:
-            self._client = storage.Client(
-                project=settings.gcs_project_id, credentials=self._credentials
-            )
+            self._client = storage.Client(project=settings.gcs_project_id)
         return self._client
 
     @property
@@ -179,11 +156,9 @@ class StorageService:
         """
         Generate temporary signed URL for accessing file.
 
-        Requires service account credentials with private key.
-
         Args:
             gcs_uri: GCS URI (gs://bucket/path/to/file.pdf)
-            expiration_minutes: URL expiry time in minutes (max 7 days)
+            expiration_minutes: URL expiry time in minutes
             disposition: "inline" (view) or "attachment" (download)
 
         Returns:
@@ -226,11 +201,9 @@ class StorageService:
             gcs_uri: GCS URI (gs://bucket/path/to/file.pdf)
 
         Returns:
-            Signed URL with inline disposition (opens in browser), valid for 1 hour
+            Signed URL with inline disposition (opens in browser)
         """
-        return self.generate_signed_url(
-            gcs_uri, expiration_minutes=60, disposition="inline"
-        )  # 1 hour
+        return self.generate_signed_url(gcs_uri, expiration_minutes=60, disposition="inline")
 
     def get_resume_download_url(self, gcs_uri: str) -> str:
         """
@@ -240,11 +213,9 @@ class StorageService:
             gcs_uri: GCS URI (gs://bucket/path/to/file.pdf)
 
         Returns:
-            Signed URL with attachment disposition (forces download), valid for 1 hour
+            Signed URL with attachment disposition (forces download)
         """
-        return self.generate_signed_url(
-            gcs_uri, expiration_minutes=60, disposition="attachment"
-        )  # 1 hour
+        return self.generate_signed_url(gcs_uri, expiration_minutes=60, disposition="attachment")
 
 
 # Singleton instance
