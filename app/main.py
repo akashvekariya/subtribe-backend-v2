@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.exceptions import register_exception_handlers
-from app.routers import applications, auth, companies, jobs
+from app.routers import applications, auth, companies, dashboard, jobs
 
 app = FastAPI(
     title="Subtribe ATS",
@@ -74,3 +74,4 @@ app.include_router(jobs.router, prefix="/jobs")
 app.include_router(jobs.public_router, prefix="/public/jobs")
 app.include_router(applications.public_router, prefix="/public")
 app.include_router(applications.router, prefix="/applications")
+app.include_router(dashboard.router, prefix="/dashboard")
