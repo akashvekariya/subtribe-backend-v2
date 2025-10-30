@@ -60,16 +60,16 @@ class ApplicationStatusUpdate(BaseModel):
         description="New status",
         pattern="^(applied|screening|interviewing|offer|hired|rejected)$",
     )
-    notes: str = Field(..., min_length=1, description="Notes about the status change (required)")
+    notes: str | None = Field(None, description="Notes about the status change (optional)")
 
     @field_validator("notes")
     @classmethod
-    def validate_notes(cls, v: str) -> str:
-        """Validate notes are not empty."""
-        v = v.strip()
-        if not v:
-            raise ValueError("Notes are required when changing status")
-        return v
+    def validate_notes(cls, v: str | None) -> str | None:
+        """Clean and validate notes if provided."""
+        if v:
+            v = v.strip()
+            return v if v else None
+        return None
 
 
 # ============================================================================
