@@ -220,8 +220,9 @@ class StorageService:
 
         except Exception as e:
             error_msg = str(e).replace("\n", " ").replace("  ", " ")
+            path_str = path if "path" in locals() else gcs_uri
             logger.error(
-                f"Failed to generate signed URL | Path: {path if 'path' in locals() else gcs_uri} | Error: {error_msg}",
+                f"Failed to generate signed URL | Path: {path_str} | Error: {error_msg}",
                 exc_info=True,
             )
             raise GoogleCloudError(f"Failed to generate download URL: {str(e)}") from e
