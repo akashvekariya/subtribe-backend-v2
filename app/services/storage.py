@@ -207,16 +207,25 @@ class StorageService:
                 logger.info(f"Generated signed URL using private key for: {path}")
             else:
                 # Cloud Run: Use IAM signBlob API
-                # Requires BOTH service_account_email AND access_token to trigger IAM signing
+                # The issue: Default compute credentials don't have iamcredentials scope
+                # Solution: Use service account credentials with proper scopes
+                from google.auth import impersonated_credentials
+                from google.auth.transport import requests as auth_requests
+
                 service_account_email = client_creds.service_account_email
 
-                # Refresh token if needed
-                if not client_creds.token or client_creds.expired:
-                    from google.auth.transport import requests as auth_requests
+                # Create impersonated credentials with full cloud-platform scope
+                # This allows the IAM signBlob API call to work
+                target_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+                signing_credentials = impersonated_credentials.Credentials(
+                    source_credentials=client_creds,
+                    target_principal=service_account_email,
+                    target_scopes=target_scopes,
+                    lifetime=3600,
+                )
 
-                    client_creds.refresh(auth_requests.Request())
-
-                access_token = client_creds.token
+                # Refresh to get token with proper scopes
+                signing_credentials.refresh(auth_requests.Request())
 
                 url = blob.generate_signed_url(
                     version="v4",
@@ -224,15 +233,19 @@ class StorageService:
                     method="GET",
                     response_disposition=f'{disposition}; filename="{filename}"',
                     service_account_email=service_account_email,
-                    access_token=access_token,
+                    access_token=signing_credentials.token,
                 )
                 logger.info(f"Generated signed URL using IAM signBlob API for: {path}")
 
             return url
 
         except Exception as e:
-            logger.error(f"Failed to generate signed URL: {str(e)}")
-            logger.exception("Full traceback:")
+            # Single-line structured logging for better debugging
+            error_msg = str(e).replace("\n", " ").replace("  ", " ")
+            logger.error(
+                f"Failed to generate signed URL | Path: {path} | Error: {error_msg}",
+                exc_info=True,
+            )
             raise GoogleCloudError(f"Failed to generate download URL: {str(e)}") from e
 
     def get_resume_view_url(self, gcs_uri: str) -> str:
