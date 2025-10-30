@@ -169,14 +169,9 @@ class StorageService:
         """
         Generate temporary signed URL for accessing file.
 
-        This method works in both environments:
-        - Local: Uses service account key file (has private key for signing)
+        Works in both environments:
+        - Local: Uses service account key file (private key signing)
         - Cloud Run: Uses IAM signBlob API (requires roles/iam.serviceAccountTokenCreator)
-
-        The google-cloud-storage library automatically handles IAM-based signing when:
-        1. Credentials don't have a private key (ADC on Cloud Run)
-        2. Service account has iam.serviceAccountTokenCreator role
-        3. No explicit credentials are passed (uses client's credentials)
 
         Args:
             gcs_uri: GCS URI (gs://bucket/path/to/file.pdf)
@@ -192,28 +187,46 @@ class StorageService:
         try:
             # Extract path from GCS URI
             path = gcs_uri.replace(f"gs://{self.bucket.name}/", "")
-
-            # Get blob
             blob = self.bucket.blob(path)
-
-            # Extract filename from path
             filename = path.split("/")[-1]
 
-            # Generate signed URL
-            # The library automatically uses:
-            # - Private key signing (local with key file)
-            # - IAM signBlob API (Cloud Run with ADC + proper IAM role)
-            url = blob.generate_signed_url(
-                version="v4",
-                expiration=timedelta(minutes=expiration_minutes),
-                method="GET",
-                response_disposition=f'{disposition}; filename="{filename}"',
-            )
+            # Get credentials to determine signing method
+            client_creds = self.client._credentials
 
-            logger.info(
-                f"Generated signed URL for: {path} (expires in {expiration_minutes}m, "
-                f"disposition: {disposition})"
-            )
+            # Check if credentials have signing capability (private key)
+            has_private_key = hasattr(client_creds, "sign_bytes")
+
+            if has_private_key:
+                # Local: Use private key signing (service account key file)
+                url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=timedelta(minutes=expiration_minutes),
+                    method="GET",
+                    response_disposition=f'{disposition}; filename="{filename}"',
+                )
+                logger.info(f"Generated signed URL using private key for: {path}")
+            else:
+                # Cloud Run: Use IAM signBlob API
+                # Requires BOTH service_account_email AND access_token to trigger IAM signing
+                service_account_email = client_creds.service_account_email
+
+                # Refresh token if needed
+                if not client_creds.token or client_creds.expired:
+                    from google.auth.transport import requests as auth_requests
+
+                    client_creds.refresh(auth_requests.Request())
+
+                access_token = client_creds.token
+
+                url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=timedelta(minutes=expiration_minutes),
+                    method="GET",
+                    response_disposition=f'{disposition}; filename="{filename}"',
+                    service_account_email=service_account_email,
+                    access_token=access_token,
+                )
+                logger.info(f"Generated signed URL using IAM signBlob API for: {path}")
 
             return url
 

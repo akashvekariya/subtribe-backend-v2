@@ -105,6 +105,28 @@ gcloud iam service-accounts keys create ~/subtribe-ats-storage-key.json \
 chmod 600 ~/subtribe-ats-storage-key.json
 ```
 
+**Service Account Usage:**
+- `subtribe-ats-storage` runs the application on Cloud Run
+- Needs: `roles/storage.objectAdmin` (bucket) + `roles/iam.serviceAccountTokenCreator` (project)
+- Already configured in `.github/workflows/main.yml:231`
+
+**To change runtime service account later:**
+```bash
+# 1. Create new service account
+gcloud iam service-accounts create NEW-NAME
+
+# 2. Grant permissions
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member="serviceAccount:NEW-NAME@PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountTokenCreator"
+gsutil iam ch serviceAccount:NEW-NAME@...:roles/storage.objectAdmin gs://BUCKET
+
+# 3. Update .github/workflows/main.yml line 231
+--service-account=NEW-NAME@PROJECT_ID.iam.gserviceaccount.com
+
+# 4. Commit and push (auto-deploys)
+```
+
 ### File Storage Strategy
 
 **GCS (Resumes Only)**:
