@@ -207,35 +207,48 @@ class StorageService:
                 logger.info(f"Generated signed URL using private key for: {path}")
             else:
                 # Cloud Run: Use IAM signBlob API
-                # The issue: Default compute credentials don't have iamcredentials scope
-                # Solution: Use service account credentials with proper scopes
-                from google.auth import impersonated_credentials
-                from google.auth.transport import requests as auth_requests
+                # When service_account_email is provided without access_token,
+                # the library uses IAM Credentials API to sign the blob
 
-                service_account_email = client_creds.service_account_email
+                # Get service account email from the running environment
+                # This is set via --service-account in Cloud Run deployment
+                if (
+                    hasattr(client_creds, "service_account_email")
+                    and client_creds.service_account_email
+                ):
+                    service_account_email = client_creds.service_account_email
+                else:
+                    # Fallback: Fetch from metadata server (Cloud Run/GCE)
+                    try:
+                        import requests as http_requests
 
-                # Create impersonated credentials with full cloud-platform scope
-                # This allows the IAM signBlob API call to work
-                target_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
-                signing_credentials = impersonated_credentials.Credentials(
-                    source_credentials=client_creds,
-                    target_principal=service_account_email,
-                    target_scopes=target_scopes,
-                    lifetime=3600,
-                )
+                        resp = http_requests.get(
+                            "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email",
+                            headers={"Metadata-Flavor": "Google"},
+                            timeout=2,
+                        )
+                        service_account_email = resp.text.strip()
+                    except Exception as e:
+                        logger.error(f"Failed to get service account email: {e}")
+                        raise GoogleCloudError(
+                            "Unable to determine service account for signing"
+                        ) from e
 
-                # Refresh to get token with proper scopes
-                signing_credentials.refresh(auth_requests.Request())
-
+                # Generate signed URL using IAM signing
+                # Library automatically calls IAM signBlob API when:
+                # 1. service_account_email is provided
+                # 2. credentials don't have private key (compute credentials)
+                # 3. Service account has iam.serviceAccountTokenCreator permission
                 url = blob.generate_signed_url(
                     version="v4",
                     expiration=timedelta(minutes=expiration_minutes),
                     method="GET",
                     response_disposition=f'{disposition}; filename="{filename}"',
                     service_account_email=service_account_email,
-                    access_token=signing_credentials.token,
                 )
-                logger.info(f"Generated signed URL using IAM signBlob API for: {path}")
+                logger.info(
+                    f"Generated signed URL using IAM signBlob API for: {path} | SA: {service_account_email}"
+                )
 
             return url
 
