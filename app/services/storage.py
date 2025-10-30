@@ -19,7 +19,15 @@ class StorageService:
     """Service for managing file uploads to Google Cloud Storage."""
 
     def __init__(self):
-        """Initialize GCS client and bucket."""
+        """Initialize GCS client and bucket.
+
+        Authentication:
+        - Local: Uses service account key file via GOOGLE_APPLICATION_CREDENTIALS
+        - Cloud Run: Uses Application Default Credentials (attached service account)
+
+        For signed URL generation on Cloud Run, the service account must have:
+        - roles/iam.serviceAccountTokenCreator (for IAM-based signing without private key)
+        """
         # Set GCS credentials from environment (skip if /dev/null or doesn't exist)
         # In Cloud Run, credentials come from the service account automatically (ADC)
         creds_path = settings.google_application_credentials
@@ -31,7 +39,12 @@ class StorageService:
 
     @property
     def client(self) -> storage.Client:
-        """Lazy-load GCS client."""
+        """Lazy-load GCS client.
+
+        Uses Application Default Credentials which automatically discovers credentials from:
+        - GOOGLE_APPLICATION_CREDENTIALS env var (local development with key file)
+        - Metadata server (Cloud Run with attached service account)
+        """
         if self._client is None:
             self._client = storage.Client(project=settings.gcs_project_id)
         return self._client
@@ -156,10 +169,19 @@ class StorageService:
         """
         Generate temporary signed URL for accessing file.
 
+        This method works in both environments:
+        - Local: Uses service account key file (has private key for signing)
+        - Cloud Run: Uses IAM signBlob API (requires roles/iam.serviceAccountTokenCreator)
+
+        The google-cloud-storage library automatically handles IAM-based signing when:
+        1. Credentials don't have a private key (ADC on Cloud Run)
+        2. Service account has iam.serviceAccountTokenCreator role
+        3. No explicit credentials are passed (uses client's credentials)
+
         Args:
             gcs_uri: GCS URI (gs://bucket/path/to/file.pdf)
             expiration_minutes: URL expiry time in minutes
-            disposition: "inline" (view) or "attachment" (download)
+            disposition: "inline" (view in browser) or "attachment" (download)
 
         Returns:
             Signed URL (valid for specified duration)
@@ -178,6 +200,9 @@ class StorageService:
             filename = path.split("/")[-1]
 
             # Generate signed URL
+            # The library automatically uses:
+            # - Private key signing (local with key file)
+            # - IAM signBlob API (Cloud Run with ADC + proper IAM role)
             url = blob.generate_signed_url(
                 version="v4",
                 expiration=timedelta(minutes=expiration_minutes),
@@ -185,12 +210,16 @@ class StorageService:
                 response_disposition=f'{disposition}; filename="{filename}"',
             )
 
-            logger.info(f"Generated signed URL for: {path} (expires in {expiration_minutes}m)")
+            logger.info(
+                f"Generated signed URL for: {path} (expires in {expiration_minutes}m, "
+                f"disposition: {disposition})"
+            )
 
             return url
 
         except Exception as e:
             logger.error(f"Failed to generate signed URL: {str(e)}")
+            logger.exception("Full traceback:")
             raise GoogleCloudError(f"Failed to generate download URL: {str(e)}") from e
 
     def get_resume_view_url(self, gcs_uri: str) -> str:
