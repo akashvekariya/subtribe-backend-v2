@@ -21,10 +21,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import StreamingResponse
 
 from app.dependencies import set_correlation_id
-from app.logging_config import (
+from app.logging.constants import ROUTE_LOGGING_RULES
+from app.logging.utils import (
     determine_log_level,
     find_matching_rule,
     mask_sensitive_data,
+    parse_json_body,
 )
 
 logger = logging.getLogger(__name__)
@@ -82,7 +84,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         # 4. Find matching logging rule for this path
         path = request.url.path
-        rule = find_matching_rule(path)
+        rule = find_matching_rule(path, ROUTE_LOGGING_RULES)
 
         # 5. Determine if we should log (sampling)
         should_log = self._should_log_request(rule)
@@ -127,7 +129,6 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 duration_ms=duration_ms,
                 status_code=status_code,
                 log_level=log_level,
-                rule=rule,
             )
 
         # 13. Add correlation ID to response headers
@@ -210,7 +211,10 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         # Add request body if configured
         if rule.get("log_request_body"):
-            body = await self._read_request_body(request)
+            body = await self._read_body(
+                body_bytes=await request.body(),
+                content_type=request.headers.get("content-type"),
+            )
             if body:
                 data["request_body"] = mask_sensitive_data(body)
 
@@ -235,12 +239,35 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             data["headers"] = dict(response.headers)
 
         # Add response body if configured
-        if rule.get("log_response_body"):
-            body = await self._read_response_body(response)
+        if (
+            rule.get("log_response_body")
+            and not isinstance(response, StreamingResponse)
+            and hasattr(response, "body")
+        ):
+            body = await self._read_body(
+                body_bytes=response.body,
+                content_type=response.headers.get("content-type"),
+            )
             if body:
                 data["response_body"] = mask_sensitive_data(body)
 
         return data
+
+    async def _read_body(
+        self,
+        body_bytes: bytes | None,
+        content_type: str | None,
+    ) -> dict | None:
+        """Read and parse request/response body.
+
+        Args:
+            body_bytes: Raw body bytes
+            content_type: Content-Type header value
+
+        Returns:
+            Parsed JSON dict or None if not JSON/empty/invalid
+        """
+        return parse_json_body(body_bytes, content_type)
 
     def _get_user_context(self, request: Request) -> dict | None:
         """Extract user context from request state.
@@ -263,76 +290,6 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             }
         return None
 
-    async def _read_request_body(self, request: Request) -> dict | None:
-        """Read and parse request body.
-
-        Attempts to parse as JSON. Returns None if not JSON or empty.
-
-        Args:
-            request: Incoming request
-
-        Returns:
-            Parsed JSON dict or None
-        """
-        try:
-            # Check content type
-            content_type = request.headers.get("content-type", "")
-            if "application/json" not in content_type:
-                return None
-
-            # Read body
-            body_bytes = await request.body()
-            if not body_bytes:
-                return None
-
-            # Parse JSON
-            import json
-
-            return json.loads(body_bytes)
-
-        except Exception:
-            # If parsing fails, don't log body
-            return None
-
-    async def _read_response_body(self, response: Response) -> dict | None:
-        """Read and parse response body.
-
-        Attempts to parse as JSON. Returns None if not JSON or empty.
-        Note: This only works for non-streaming responses.
-
-        Args:
-            response: Outgoing response
-
-        Returns:
-            Parsed JSON dict or None
-        """
-        try:
-            # Skip streaming responses
-            if isinstance(response, StreamingResponse):
-                return None
-
-            # Check content type
-            content_type = response.headers.get("content-type", "")
-            if "application/json" not in content_type:
-                return None
-
-            # Read body
-            if hasattr(response, "body"):
-                body_bytes = response.body
-                if not body_bytes:
-                    return None
-
-                # Parse JSON
-                import json
-
-                return json.loads(body_bytes)
-
-        except Exception:
-            # If parsing fails, don't log body
-            return None
-
-        return None
-
     def _log_request_response(
         self,
         correlation_id: str,
@@ -341,7 +298,6 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         duration_ms: int,
         status_code: int,
         log_level: str,
-        rule: dict,
     ):
         """Log single consolidated entry for request/response.
 
@@ -352,7 +308,6 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             duration_ms: Request duration in milliseconds
             status_code: HTTP status code
             log_level: "full" or "metadata"
-            rule: Route-specific logging rule
         """
         # Build log entry
         log_entry = {

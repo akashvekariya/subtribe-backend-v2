@@ -1,11 +1,11 @@
 """Logging helper functions.
 
 This module provides utility functions for manual logging in endpoints:
-- get_correlation_id(): Get current request correlation ID
 - log_business_event(): Log business-level events (e.g., job created)
 - log_security_event(): Log security-related events (e.g., login failed)
 - log_performance_event(): Log performance metrics
-- mask_sensitive_data(): Mask sensitive fields in logs
+- log_external_service_call(): Log external service calls
+- log_database_event(): Log database operations
 
 See vibe-plan/logging.md for complete documentation.
 """
@@ -14,9 +14,48 @@ import logging
 from typing import Any
 
 from app.dependencies import get_correlation_id
-from app.logging_config import mask_sensitive_data as _mask_sensitive_data
+from app.logging.utils import build_log_data, mask_sensitive_data
 
 logger = logging.getLogger(__name__)
+
+
+def _log_event(
+    description: str,
+    event_type: str,
+    base_fields: dict[str, Any],
+    optional_fields: dict[str, Any] | None = None,
+    level: int = logging.INFO,
+    mask_metadata: bool = True,
+):
+    """Base helper for logging events with common pattern.
+
+    Args:
+        description: Human-readable description
+        event_type: Type of event (business, security, performance, etc.)
+        base_fields: Required fields (event, etc.)
+        optional_fields: Optional fields to include if not None
+        level: Python log level (INFO, WARNING, ERROR)
+        mask_metadata: Whether to mask sensitive data in metadata
+    """
+    # Mask metadata if present and masking enabled
+    if (
+        mask_metadata
+        and optional_fields
+        and "metadata" in optional_fields
+        and optional_fields["metadata"] is not None
+    ):
+        optional_fields["metadata"] = mask_sensitive_data(optional_fields["metadata"])
+
+    # Build log data with correlation ID
+    log_data = build_log_data(
+        correlation_id=get_correlation_id(),
+        event_type=event_type,
+        base_data={**base_fields, "description": description},
+        optional_fields=optional_fields,
+    )
+
+    # Log at specified level
+    logger.log(level, description, extra=log_data)
 
 
 def log_business_event(
@@ -56,25 +95,19 @@ def log_business_event(
             metadata={"title": job.title, "status": job.status}
         )
     """
-    log_data = {
-        "correlation_id": get_correlation_id(),
-        "event_type": "business",
-        "event": event,
-        "description": description,
-    }
-
-    if user_id:
-        log_data["user_id"] = user_id
-    if company_id:
-        log_data["company_id"] = company_id
-    if resource_id:
-        log_data["resource_id"] = resource_id
-    if resource_type:
-        log_data["resource_type"] = resource_type
-    if metadata:
-        log_data["metadata"] = _mask_sensitive_data(metadata)
-
-    logger.info(description, extra=log_data)
+    _log_event(
+        description=description,
+        event_type="business",
+        base_fields={"event": event},
+        optional_fields={
+            "user_id": user_id,
+            "company_id": company_id,
+            "resource_id": resource_id,
+            "resource_type": resource_type,
+            "metadata": metadata,
+        },
+        level=logging.INFO,
+    )
 
 
 def log_security_event(
@@ -129,32 +162,20 @@ def log_security_event(
             metadata={"email": email}
         )
     """
-    log_data = {
-        "correlation_id": get_correlation_id(),
-        "event_type": "security",
-        "event": event,
-        "description": description,
-        "success": success,
-    }
-
-    if user_id:
-        log_data["user_id"] = user_id
-    if company_id:
-        log_data["company_id"] = company_id
-    if ip_address:
-        log_data["ip_address"] = ip_address
-    if user_agent:
-        log_data["user_agent"] = user_agent
-    if reason:
-        log_data["reason"] = reason
-    if metadata:
-        log_data["metadata"] = _mask_sensitive_data(metadata)
-
-    # Log as warning for failures, info for success
-    if success:
-        logger.info(description, extra=log_data)
-    else:
-        logger.warning(description, extra=log_data)
+    _log_event(
+        description=description,
+        event_type="security",
+        base_fields={"event": event, "success": success},
+        optional_fields={
+            "user_id": user_id,
+            "company_id": company_id,
+            "ip_address": ip_address,
+            "user_agent": user_agent,
+            "reason": reason,
+            "metadata": metadata,
+        },
+        level=logging.INFO if success else logging.WARNING,
+    )
 
 
 def log_performance_event(
@@ -201,30 +222,24 @@ def log_performance_event(
                 metadata={"query": "SELECT applications..."}
             )
     """
-    log_data = {
-        "correlation_id": get_correlation_id(),
-        "event_type": "performance",
-        "operation": operation,
-        "duration_ms": duration_ms,
-        "success": success,
-    }
-
-    if resource_count is not None:
-        log_data["resource_count"] = resource_count
-    if metadata:
-        log_data["metadata"] = _mask_sensitive_data(metadata)
-
-    # Log as warning if slow (> 1 second)
+    # Build description based on duration
     if duration_ms > 1000:
-        logger.warning(
-            f"Slow operation: {operation} took {duration_ms}ms",
-            extra=log_data,
-        )
+        description = f"Slow operation: {operation} took {duration_ms}ms"
+        level = logging.WARNING
     else:
-        logger.info(
-            f"Performance: {operation} took {duration_ms}ms",
-            extra=log_data,
-        )
+        description = f"Performance: {operation} took {duration_ms}ms"
+        level = logging.INFO
+
+    _log_event(
+        description=description,
+        event_type="performance",
+        base_fields={"operation": operation, "duration_ms": duration_ms, "success": success},
+        optional_fields={
+            "resource_count": resource_count,
+            "metadata": metadata,
+        },
+        level=level,
+    )
 
 
 def log_external_service_call(
@@ -265,32 +280,30 @@ def log_external_service_call(
             }
         )
     """
-    log_data = {
-        "correlation_id": get_correlation_id(),
-        "event_type": "external_service",
-        "service": service,
-        "operation": operation,
-        "duration_ms": duration_ms,
-        "success": success,
-    }
-
-    if status_code:
-        log_data["status_code"] = status_code
-    if error:
-        log_data["error"] = error
-    if metadata:
-        log_data["metadata"] = _mask_sensitive_data(metadata)
-
+    # Build description
     if success:
-        logger.info(
-            f"External service call: {service}.{operation}",
-            extra=log_data,
-        )
+        description = f"External service call: {service}.{operation}"
+        level = logging.INFO
     else:
-        logger.error(
-            f"External service call failed: {service}.{operation} - {error}",
-            extra=log_data,
-        )
+        description = f"External service call failed: {service}.{operation} - {error}"
+        level = logging.ERROR
+
+    _log_event(
+        description=description,
+        event_type="external_service",
+        base_fields={
+            "service": service,
+            "operation": operation,
+            "duration_ms": duration_ms,
+            "success": success,
+        },
+        optional_fields={
+            "status_code": status_code,
+            "error": error,
+            "metadata": metadata,
+        },
+        level=level,
+    )
 
 
 def log_database_event(
@@ -327,41 +340,27 @@ def log_database_event(
             success=True
         )
     """
-    log_data = {
-        "correlation_id": get_correlation_id(),
-        "event_type": "database",
-        "operation": operation,
-        "table": table,
-        "duration_ms": duration_ms,
-        "success": success,
-    }
-
-    if record_count is not None:
-        log_data["record_count"] = record_count
-    if error:
-        log_data["error"] = error
-
+    # Build description
     if success:
-        logger.info(
-            f"Database operation: {operation} on {table}",
-            extra=log_data,
-        )
+        description = f"Database operation: {operation} on {table}"
+        level = logging.INFO
     else:
-        logger.error(
-            f"Database operation failed: {operation} on {table} - {error}",
-            extra=log_data,
-        )
+        description = f"Database operation failed: {operation} on {table} - {error}"
+        level = logging.ERROR
 
-
-def mask_sensitive_data(data: Any) -> Any:
-    """Mask sensitive data in logs.
-
-    Re-exports mask_sensitive_data from logging_config for convenience.
-
-    Args:
-        data: Data to mask (dict, list, or primitive)
-
-    Returns:
-        Masked copy of data
-    """
-    return _mask_sensitive_data(data)
+    _log_event(
+        description=description,
+        event_type="database",
+        base_fields={
+            "operation": operation,
+            "table": table,
+            "duration_ms": duration_ms,
+            "success": success,
+        },
+        optional_fields={
+            "record_count": record_count,
+            "error": error,
+        },
+        level=level,
+        mask_metadata=False,  # No metadata in database events
+    )

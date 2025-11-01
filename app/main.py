@@ -8,8 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.exceptions import register_exception_handlers
-from app.logging_config import setup_logging
-from app.middleware.logging_middleware import LoggingMiddleware
+from app.logging import LoggingMiddleware, setup_logging
 from app.routers import applications, auth, companies, dashboard, jobs
 
 logger = logging.getLogger(__name__)
