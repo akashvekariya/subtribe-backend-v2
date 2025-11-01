@@ -389,3 +389,86 @@ class PublicJobResponse(BaseModel):
 
     # Company details for candidates
     company: CompanyPublicResponse
+
+
+# ============================================================================
+# Job Statistics Schemas
+# ============================================================================
+
+
+class JobApplicationsByStatus(BaseModel):
+    """Applications grouped by status for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    applied: int
+    screening: int
+    interviewing: int
+    offer: int
+    hired: int
+    rejected: int
+
+
+class JobApplicationStats(BaseModel):
+    """Application statistics for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    total: int
+    today: int
+    this_week: int
+    this_month: int
+    by_status: JobApplicationsByStatus
+
+
+class JobViewStats(BaseModel):
+    """View statistics for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    total: int
+
+
+class JobQualityMetrics(BaseModel):
+    """Quality and conversion metrics for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    application_rate: float  # (applications / views) * 100
+    screening_rate: float  # (screening+ / total) * 100 - how many pass initial screen
+    interview_rate: float  # (interviewing+ / total) * 100
+    offer_rate: float  # (offer+ / total) * 100
+    hire_rate: float  # (hired / total) * 100
+
+
+class JobActivityStats(BaseModel):
+    """Activity metrics for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    latest_application_at: datetime | None = None
+    days_since_last_application: int | None = None
+    days_since_published: int | None = None
+    is_recently_active: bool  # True if application in last 7 days
+
+
+class JobPipelineStats(BaseModel):
+    """Pipeline conversion metrics for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    conversion_rate: float
+    avg_time_to_hire_days: float | None = None
+
+
+class JobStatsResponse(BaseModel):
+    """Statistics response for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    applications: JobApplicationStats
+    views: JobViewStats
+    quality: JobQualityMetrics
+    activity: JobActivityStats
+    pipeline: JobPipelineStats | None = None
+    generated_at: datetime
