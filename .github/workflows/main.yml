@@ -214,7 +214,24 @@ jobs:
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:latest
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ github.sha }}
 
-      # Step 9: Deploy to Cloud Run
+      # Step 9: Debug - Print CORS variable
+      # REASON: Debug what's actually in the CORS_ALLOWED_ORIGINS variable
+      - name: Debug CORS variable
+        run: |
+          echo "🔍 Debugging CORS_ALLOWED_ORIGINS variable..."
+          echo "Raw value: ${{ vars.CORS_ALLOWED_ORIGINS }}"
+          echo "---"
+          echo "Length: ${#CORS_VAR}"
+          CORS_VAR="${{ vars.CORS_ALLOWED_ORIGINS }}"
+          echo "Stored in bash variable: $CORS_VAR"
+          echo "---"
+          echo "Character by character (first 50 chars):"
+          echo "$CORS_VAR" | head -c 50 | od -c
+          echo "---"
+          echo "Testing with printf:"
+          printf "CORS value: %s\n" "${{ vars.CORS_ALLOWED_ORIGINS }}"
+
+      # Step 10: Deploy to Cloud Run
       # REASON: Use dynamic service_name, env_name, and version
       # OLD: Always deployed to subtribe-ats-api-dev with ENVIRONMENT=development
       # NEW: Deploys to dev or prod based on branch
@@ -239,7 +256,7 @@ jobs:
             --max-instances=2 \
             --min-instances=0
 
-      # Step 10: Get service URL
+      # Step 11: Get service URL
       # REASON: Use dynamic service_name and version
       - name: Get service URL
         run: |
@@ -254,7 +271,7 @@ jobs:
           echo "📦 Version: $VERSION_TAG"
           echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
 
-      # Step 11: Run smoke test
+      # Step 12: Run smoke test
       # REASON: Use dynamic service_name from deployment_target step
       - name: Smoke test
         run: |
