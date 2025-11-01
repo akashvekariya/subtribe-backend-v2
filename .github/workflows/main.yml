@@ -214,11 +214,32 @@ jobs:
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:latest
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ github.sha }}
 
-      # Step 9: Deploy to Cloud Run
-      # REASON: Use dynamic service_name, env_name, and version
-      # OLD: Always deployed to subtribe-ats-api-dev with ENVIRONMENT=development
-      # NEW: Deploys to dev or prod based on branch
-      # IMPORTANT: Mounts GCS service account key as secret for signed URL generation
+      # Step 9: Create environment variables YAML file
+      # REASON: Proper handling of special characters in env vars (regex patterns, etc.)
+      - name: Create env vars file
+        run: |
+          cat > env-vars.yaml <<EOF
+          ENVIRONMENT: ${{ steps.deployment_target.outputs.env_name }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          JWT_ALGORITHM: HS256
+          JWT_EXPIRY_DAYS: "15"
+          REFRESH_TOKEN_EXPIRY_DAYS: "30"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+          GCS_PROJECT_ID: ${{ vars.GCS_PROJECT_ID }}
+          CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS }}
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcs-key.json
+          EOF
+          echo "✅ Environment variables file created"
+          echo "📋 Contents (secrets masked):"
+          cat env-vars.yaml | grep -v -E "(DATABASE_URL|JWT_SECRET_KEY|SUPABASE_|GCS_BUCKET)"
+
+      # Step 10: Deploy to Cloud Run
+      # REASON: Use env-vars-file for proper handling of special characters
       - name: Deploy to Cloud Run
         run: |
           VERSION_TAG="${{ steps.tag_version.outputs.new_tag || github.sha }}"
@@ -230,20 +251,7 @@ jobs:
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --update-env-vars=ENVIRONMENT=${{ steps.deployment_target.outputs.env_name }} \
-            --update-env-vars=DATABASE_URL=${{ secrets.DATABASE_URL }} \
-            --update-env-vars=JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
-            --update-env-vars=JWT_ALGORITHM=HS256 \
-            --update-env-vars=JWT_EXPIRY_DAYS=15 \
-            --update-env-vars=REFRESH_TOKEN_EXPIRY_DAYS=30 \
-            --update-env-vars=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --update-env-vars=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-            --update-env-vars=SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }} \
-            --update-env-vars=SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }} \
-            --update-env-vars=GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }} \
-            --update-env-vars=GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }} \
-            --update-env-vars="CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }}" \
-            --update-env-vars=GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcs-key.json \
+            --env-vars-file=env-vars.yaml \
             --set-secrets="/tmp/gcs-key.json=gcs-credentials:latest" \
             --service-account=subtribe-ats-storage@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --memory=512Mi \
@@ -252,7 +260,7 @@ jobs:
             --max-instances=2 \
             --min-instances=0
 
-      # Step 10: Get service URL
+      # Step 11: Get service URL
       # REASON: Use dynamic service_name and version
       - name: Get service URL
         run: |
@@ -267,7 +275,7 @@ jobs:
           echo "📦 Version: $VERSION_TAG"
           echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
 
-      # Step 11: Run smoke test
+      # Step 12: Run smoke test
       # REASON: Use dynamic service_name from deployment_target step
       - name: Smoke test
         run: |
