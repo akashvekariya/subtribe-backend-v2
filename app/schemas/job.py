@@ -56,12 +56,36 @@ class JobCreate(BaseModel):
     # Status (optional, defaults to draft)
     status: str | None = Field("draft", description="draft | active | closed")
 
+    @field_validator("title", "description")
+    @classmethod
+    def validate_required_text(cls, v: str, info) -> str:
+        """Validate required text fields."""
+        if not v or not v.strip():
+            field_name = info.field_name.title()
+            raise ValueError(f"{field_name} is required and cannot be empty")
+        v = v.strip()
+        if info.field_name == "title" and len(v) > 255:
+            raise ValueError("Job title must be 255 characters or less")
+        if info.field_name == "description" and len(v) > 100000:
+            raise ValueError("Job description is too long (maximum 100,000 characters)")
+        return v
+
     @field_validator("position_type")
     @classmethod
     def validate_position_type(cls, v):
-        if v and v not in ["full_time", "part_time", "contract", "internship"]:
+        valid_types = [
+            "full_time",
+            "part_time",
+            "contract",
+            "temporary",
+            "other",
+            "volunteer",
+            "internship",
+        ]
+        if v and v not in valid_types:
             raise ValueError(
-                "position_type must be one of: full_time, part_time, contract, internship"
+                "Position type must be one of: Full-time, Part-time, Contract, "
+                "Temporary, Other, Volunteer, or Internship"
             )
         return v
 
@@ -69,14 +93,37 @@ class JobCreate(BaseModel):
     @classmethod
     def validate_location_type(cls, v):
         if v and v not in ["remote", "hybrid", "onsite"]:
-            raise ValueError("location_type must be one of: remote, hybrid, onsite")
+            raise ValueError("Location type must be one of: Remote, Hybrid, or Onsite")
         return v
 
     @field_validator("status")
     @classmethod
     def validate_status(cls, v):
         if v not in ["draft", "active", "closed"]:
-            raise ValueError("status must be one of: draft, active, closed")
+            raise ValueError("Job status must be one of: Draft, Active, or Closed")
+        return v
+
+    @field_validator("salary_min", "salary_max")
+    @classmethod
+    def validate_salary(cls, v: int | None, info) -> int | None:
+        """Validate salary fields."""
+        if v is None:
+            return None
+        if v < 0:
+            field_name = "Minimum salary" if info.field_name == "salary_min" else "Maximum salary"
+            raise ValueError(f"{field_name} cannot be negative")
+        return v
+
+    @field_validator("min_experience_years", "max_experience_years")
+    @classmethod
+    def validate_experience(cls, v: int | None, info) -> int | None:
+        """Validate experience fields."""
+        if v is None:
+            return None
+        if v < 0:
+            raise ValueError("Years of experience cannot be negative")
+        if v > 50:
+            raise ValueError("Years of experience must be 50 or less")
         return v
 
 
@@ -109,12 +156,48 @@ class JobUpdate(BaseModel):
 
     status: str | None = None
 
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, v: str | None) -> str | None:
+        """Validate title."""
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            raise ValueError("Job title cannot be empty")
+        if len(v) > 255:
+            raise ValueError("Job title must be 255 characters or less")
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, v: str | None) -> str | None:
+        """Validate description."""
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            raise ValueError("Job description cannot be empty")
+        if len(v) > 100000:
+            raise ValueError("Job description is too long (maximum 100,000 characters)")
+        return v
+
     @field_validator("position_type")
     @classmethod
     def validate_position_type(cls, v):
-        if v and v not in ["full_time", "part_time", "contract", "internship"]:
+        valid_types = [
+            "full_time",
+            "part_time",
+            "contract",
+            "temporary",
+            "other",
+            "volunteer",
+            "internship",
+        ]
+        if v and v not in valid_types:
             raise ValueError(
-                "position_type must be one of: full_time, part_time, contract, internship"
+                "Position type must be one of: Full-time, Part-time, Contract, "
+                "Temporary, Other, Volunteer, or Internship"
             )
         return v
 
@@ -122,14 +205,37 @@ class JobUpdate(BaseModel):
     @classmethod
     def validate_location_type(cls, v):
         if v and v not in ["remote", "hybrid", "onsite"]:
-            raise ValueError("location_type must be one of: remote, hybrid, onsite")
+            raise ValueError("Location type must be one of: Remote, Hybrid, or Onsite")
         return v
 
     @field_validator("status")
     @classmethod
     def validate_status(cls, v):
         if v and v not in ["draft", "active", "closed"]:
-            raise ValueError("status must be one of: draft, active, closed")
+            raise ValueError("Job status must be one of: Draft, Active, or Closed")
+        return v
+
+    @field_validator("salary_min", "salary_max")
+    @classmethod
+    def validate_salary(cls, v: int | None, info) -> int | None:
+        """Validate salary fields."""
+        if v is None:
+            return None
+        if v < 0:
+            field_name = "Minimum salary" if info.field_name == "salary_min" else "Maximum salary"
+            raise ValueError(f"{field_name} cannot be negative")
+        return v
+
+    @field_validator("min_experience_years", "max_experience_years")
+    @classmethod
+    def validate_experience(cls, v: int | None, info) -> int | None:
+        """Validate experience fields."""
+        if v is None:
+            return None
+        if v < 0:
+            raise ValueError("Years of experience cannot be negative")
+        if v > 50:
+            raise ValueError("Years of experience must be 50 or less")
         return v
 
 

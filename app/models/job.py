@@ -121,7 +121,8 @@ class Job(Base):
             "location_type IN ('remote', 'hybrid', 'onsite')", name="valid_location_type"
         ),
         CheckConstraint(
-            "position_type IN ('full_time', 'part_time', 'contract', 'internship')",
+            "position_type IN ('full_time', 'part_time', 'contract', 'temporary', "
+            "'other', 'volunteer', 'internship')",
             name="valid_position_type",
         ),
         # Performance index for GET /jobs endpoint (paginated listing)
