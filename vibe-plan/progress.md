@@ -116,7 +116,7 @@
 - [x] JWT expiry: 20 days
 - [x] Fixed all dependencies (email-validator, greenlet, bcrypt)
 - [x] Fixed DATABASE_URL to use +psycopg (switched from asyncpg for PgBouncer compatibility)
-- [x] Fixed bcrypt compatibility (downgraded to 3.2.2 for passlib 1.7.4)
+- [x] Fixed Python 3.13 compatibility (replaced passlib with direct bcrypt, removed deprecated crypt module dependency)
 - [x] Removed email_verified field (deferred to V1.1)
 - [x] **All endpoints tested and working perfectly** ✨
 

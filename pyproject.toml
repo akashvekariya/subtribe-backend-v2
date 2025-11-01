@@ -105,7 +105,6 @@ module = [
     "google.cloud.*",
     "sqlalchemy.*",
     "alembic.*",
-    "passlib.*",
     "jose.*",
 ]
 ignore_missing_imports = true
