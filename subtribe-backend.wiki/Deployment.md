@@ -52,14 +52,19 @@ Navigate to **Settings → Secrets and variables → Actions → Secrets**
 
 Navigate to **Settings → Secrets and variables → Actions → Variables**
 
-| Variable | Description |
-|----------|-------------|
-| `GCP_PROJECT_ID` | Google Cloud project ID |
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_ANON_KEY` | Supabase anon public key |
-| `GCS_BUCKET_NAME` | GCS bucket name (production) |
-| `GCS_PROJECT_ID` | GCP project ID (same as above) |
-| `CORS_ORIGINS` | Allowed origins (e.g., `*` or `https://app.example.com`) |
+| Variable | Description | Type |
+|----------|-------------|------|
+| `DATABASE_URL` | Database connection string | Environment Secret |
+| `JWT_SECRET_KEY` | Backend JWT signing key | Environment Secret |
+| `SUPABASE_URL` | Supabase project URL | Environment Secret |
+| `SUPABASE_ANON_KEY` | Supabase anon public key | Environment Secret |
+| `SUPABASE_SERVICE_KEY` | Supabase service key | Environment Secret |
+| `SUPABASE_JWT_SECRET` | Supabase JWT secret | Environment Secret |
+| `GCS_BUCKET_NAME` | GCS bucket name | Environment Secret |
+| `CORS_ALLOWED_ORIGINS` | Allowed origins regex | Environment Variable |
+| `GCP_PROJECT_ID` | Google Cloud project ID | Repository Variable |
+| `GCS_PROJECT_ID` | GCP project ID (same as above) | Repository Variable |
+| `GCP_SA_KEY` | GCP service account JSON key | Repository Secret |
 
 ---
 

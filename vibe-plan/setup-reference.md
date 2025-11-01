@@ -195,8 +195,8 @@ GCS_BUCKET_NAME=subtribe-ats-resumes-dev
 GCS_PROJECT_ID=subtribe-ats-prod
 GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/subtribe-ats-storage-key.json
 
-# CORS
-CORS_ORIGINS=["http://localhost:3000","http://localhost:5173"]
+# CORS (regex pattern for allowed origins)
+CORS_ALLOWED_ORIGINS=^https?://(localhost(:\d+)?|192\.168\.\d{1,3}\.\d{1,3}(:\d+)?)$
 
 # Pagination
 DEFAULT_PAGE_SIZE=20

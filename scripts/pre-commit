@@ -58,7 +58,7 @@ export SUPABASE_JWT_SECRET="test-jwt-secret"
 export GCS_BUCKET_NAME="test-bucket"
 export GCS_PROJECT_ID="test-project"
 export GOOGLE_APPLICATION_CREDENTIALS="/tmp/fake-credentials.json"
-export CORS_ORIGINS='["http://localhost:3000"]'
+export CORS_ALLOWED_ORIGINS='^https?://localhost(:\d+)?$'
 export ENVIRONMENT="testing"
 
 # Create fake credentials file

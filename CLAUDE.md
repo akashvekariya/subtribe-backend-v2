@@ -396,7 +396,7 @@ GCS_PROJECT_ID=your-gcp-project
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 
 # App
-CORS_ORIGINS=["http://localhost:3000"]
+CORS_ALLOWED_ORIGINS=^https?://(localhost(:\d+)?|192\.168\.\d{1,3}\.\d{1,3}(:\d+)?)$
 ENVIRONMENT=development
 DEBUG=true
 ```

@@ -1,48 +1,90 @@
 # CORS Configuration
 
-## GitHub Variable Setup
+## Strategy: Environment-Specific CORS
 
-Go to **Settings → Secrets and variables → Actions → Variables** and add:
+### **Production** (GitHub Actions)
+**Only allows thesubtribe.com domains** - No localhost, no IPs
 
-### Variable: `CORS_ALLOWED_ORIGINS`
+### **Local Development**
+**Allows localhost + 192.168.x.x IPs** - For testing from phones/tablets on local network
+
+---
+
+## 🚀 GitHub Environment Setup (Development)
+
+Go to **Settings → Environments → Development** and add these secrets/variables:
+
+### Environment: `Development`
+
+#### Secrets (encrypted):
+- `DATABASE_URL` - Dev Supabase database URL
+- `JWT_SECRET_KEY` - Dev JWT secret
+- `SUPABASE_URL` - Dev Supabase project URL
+- `SUPABASE_ANON_KEY` - Dev Supabase anon key
+- `SUPABASE_SERVICE_KEY` - Dev Supabase service key
+- `SUPABASE_JWT_SECRET` - Dev Supabase JWT secret
+- `GCS_BUCKET_NAME` - Dev GCS bucket name (e.g., `subtribe-ats-resumes-dev`)
+
+#### Variable: `CORS_ALLOWED_ORIGINS`
 
 **Value** (copy this exactly):
 ```
-^https?://(localhost(:\d+)?|([a-z0-9-]+\.)?thesubtribe\.com)$
+^https?://(localhost(:\d+)?|192\.168\.\d{1,3}\.\d{1,3}(:\d+)?|([a-z0-9-]+\.)?thesubtribe\.com)$
+```
+
+This regex allows:
+- ✅ `http://localhost:3000` (local testing)
+- ✅ `http://192.168.1.100:3000` (testing from devices on network)
+- ✅ `https://thesubtribe.com` (production frontend)
+- ✅ `https://app.thesubtribe.com` (production app)
+- ✅ Any subdomain of thesubtribe.com
+
+---
+
+## 💻 Local Development
+
+Your `.env.development` file should have:
+```bash
+CORS_ALLOWED_ORIGINS=^https?://(localhost(:\d+)?|192\.168\.\d{1,3}\.\d{1,3}(:\d+)?)$
 ```
 
 This regex allows:
 - ✅ `http://localhost` (any port)
 - ✅ `http://localhost:3000`
-- ✅ `http://localhost:5173`
-- ✅ `https://thesubtribe.com`
-- ✅ `https://app.thesubtribe.com`
-- ✅ `https://staging.thesubtribe.com`
-- ✅ Any subdomain of thesubtribe.com
+- ✅ `http://192.168.1.100:3000` (any 192.168.x.x IP with optional port)
+- ✅ `http://192.168.0.50:5173`
+- ❌ `https://thesubtribe.com` (use production for that)
 
----
-
-## Local Development
-
-Your `.env.*` file should have:
-```bash
-CORS_ALLOWED_ORIGINS=^https?://localhost(:\d+)?$
-```
-
-(Already added for you ✅)
+**Default value updated in `app/config.py` ✅**
 
 ---
 
 ## How It Works
 
-**Regex Pattern Breakdown**:
+### Production Pattern
+```
+^https?://([a-z0-9-]+\.)?thesubtribe\.com$
+```
+**Breakdown**:
+```
+^https?://                    # http:// or https://
+([a-z0-9-]+\.)?              # optional subdomain (app., staging., etc)
+thesubtribe\.com             # main domain only
+$
+```
+
+### Development Pattern
+```
+^https?://(localhost(:\d+)?|192\.168\.\d{1,3}\.\d{1,3}(:\d+)?)$
+```
+**Breakdown**:
 ```
 ^https?://                    # http:// or https://
 (
   localhost(:\d+)?            # localhost with optional port
   |                           # OR
-  ([a-z0-9-]+\.)?             # optional subdomain (app., staging., etc)
-  thesubtribe\.com            # main domain
+  192\.168\.\d{1,3}\.\d{1,3}  # 192.168.x.x IP addresses
+  (:\d+)?                     # optional port
 )$
 ```
 
@@ -84,20 +126,30 @@ After deployment, test from:
 
 **Test regex online**:
 - Go to https://regex101.com
-- Paste: `^https?://(localhost(:\d+)?|([a-z0-9-]+\.)?thesubtribe\.com)$`
+
+**Production pattern**: `^https?://([a-z0-9-]+\.)?thesubtribe\.com$`
+- Test strings:
+  - `https://thesubtribe.com` ✅
+  - `https://app.thesubtribe.com` ✅
+  - `http://localhost:3000` ❌
+  - `https://random.com` ❌
+
+**Development pattern**: `^https?://(localhost(:\d+)?|192\.168\.\d{1,3}\.\d{1,3}(:\d+)?)$`
 - Test strings:
   - `http://localhost:3000` ✅
-  - `https://app.thesubtribe.com` ✅
-  - `https://random.com` ❌
+  - `http://192.168.1.100:3000` ✅
+  - `https://thesubtribe.com` ❌
 
 ---
 
 ## Security Note
 
-This regex is **more secure** than `*`:
-- Only allows your domains
+This approach is **more secure** than using `*`:
+- **Production**: Only allows your domains (no localhost/IPs leak)
+- **Development**: Locked to local network (192.168.x.x) + localhost only
 - Blocks random external sites
 - Allows credentials (JWT in headers)
+- Environment-specific: Production can't be accessed from dev tools
 
 ---
 

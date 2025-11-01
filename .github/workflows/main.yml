@@ -113,6 +113,8 @@ jobs:
     name: Build & Deploy to Cloud Run
     runs-on: ubuntu-latest
     needs: lint-test  # Wait for lint-test to pass
+    # Use GitHub Environment for environment-specific secrets/variables
+    environment: Development
     # OLD: if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     # REASON: Now supports deployment from any branch (if commit starts with "push-") OR main branch
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.event.head_commit.message, 'push-')))
@@ -228,7 +230,7 @@ jobs:
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --set-env-vars="ENVIRONMENT=${{ steps.deployment_target.outputs.env_name }},DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=HS256,JWT_EXPIRY_DAYS=15,REFRESH_TOKEN_EXPIRY_DAYS=30,SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }},GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcs-key.json" \
+            --set-env-vars="ENVIRONMENT=${{ steps.deployment_target.outputs.env_name }},DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=HS256,JWT_EXPIRY_DAYS=15,REFRESH_TOKEN_EXPIRY_DAYS=30,SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }},GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcs-key.json" \
             --set-secrets="/tmp/gcs-key.json=gcs-credentials:latest" \
             --service-account=subtribe-ats-storage@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --memory=512Mi \
