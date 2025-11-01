@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import time
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import BinaryIO
@@ -12,6 +13,7 @@ from google.cloud.exceptions import GoogleCloudError
 from google.oauth2 import service_account
 
 from app.config import settings
+from app.dependencies import get_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,16 @@ class StorageService:
                 creds_path,
                 scopes=["https://www.googleapis.com/auth/cloud-platform"],
             )
-            logger.info(f"Loaded service account credentials from: {creds_path}")
+            logger.info(
+                "Service account credentials loaded",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "credentials_loaded",
+                    "credentials_path": creds_path,
+                },
+            )
 
         return self._signing_credentials
 
@@ -154,6 +165,7 @@ class StorageService:
         Raises:
             GoogleCloudError: If upload fails
         """
+        start_time = time.time()
         try:
             # Determine file extension
             extension = "pdf" if "pdf" in content_type.lower() else "docx"
@@ -171,13 +183,47 @@ class StorageService:
             blob = self.bucket.blob(path)
             blob.upload_from_file(file, content_type=content_type, timeout=60)
 
-            logger.info(f"Uploaded resume to GCS: {path}")
+            duration_ms = int((time.time() - start_time) * 1000)
+            gcs_uri = f"gs://{self.bucket.name}/{path}"
+
+            logger.info(
+                "Resume uploaded to GCS",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "resume_upload",
+                    "duration_ms": duration_ms,
+                    "success": True,
+                    "gcs_uri": gcs_uri,
+                    "company_id": company_id,
+                    "job_id": job_id,
+                    "application_id": application_id,
+                    "content_type": content_type,
+                },
+            )
 
             # Return GCS URI
-            return f"gs://{self.bucket.name}/{path}"
+            return gcs_uri
 
         except Exception as e:
-            logger.error(f"Failed to upload resume: {str(e)}")
+            duration_ms = int((time.time() - start_time) * 1000)
+            logger.error(
+                "Failed to upload resume to GCS",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "resume_upload",
+                    "duration_ms": duration_ms,
+                    "success": False,
+                    "error": str(e),
+                    "company_id": company_id,
+                    "job_id": job_id,
+                    "application_id": application_id,
+                },
+                exc_info=True,
+            )
             raise GoogleCloudError(f"Failed to upload file: {str(e)}") from e
 
     def generate_signed_url(
@@ -200,6 +246,7 @@ class StorageService:
         Raises:
             GoogleCloudError: If URL generation fails
         """
+        start_time = time.time()
         try:
             # Extract path from GCS URI
             path = gcs_uri.replace(f"gs://{self.bucket.name}/", "")
@@ -215,14 +262,42 @@ class StorageService:
                 credentials=self._get_credentials(),
             )
 
-            logger.info(f"Generated signed URL for: {path} (expires in {expiration_minutes}m)")
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            logger.info(
+                "Generated signed URL for GCS file",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "generate_signed_url",
+                    "duration_ms": duration_ms,
+                    "success": True,
+                    "gcs_uri": gcs_uri,
+                    "disposition": disposition,
+                    "expiration_minutes": expiration_minutes,
+                },
+            )
             return url
 
         except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
             error_msg = str(e).replace("\n", " ").replace("  ", " ")
             path_str = path if "path" in locals() else gcs_uri
+
             logger.error(
-                f"Failed to generate signed URL | Path: {path_str} | Error: {error_msg}",
+                "Failed to generate signed URL",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "generate_signed_url",
+                    "duration_ms": duration_ms,
+                    "success": False,
+                    "gcs_uri": gcs_uri,
+                    "path": path_str,
+                    "error": error_msg,
+                },
                 exc_info=True,
             )
             raise GoogleCloudError(f"Failed to generate download URL: {str(e)}") from e

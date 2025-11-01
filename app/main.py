@@ -1,17 +1,49 @@
 """FastAPI application entry point."""
 
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.exceptions import register_exception_handlers
+from app.logging_config import setup_logging
+from app.middleware.logging_middleware import LoggingMiddleware
 from app.routers import applications, auth, companies, dashboard, jobs
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events (startup and shutdown)."""
+    # Startup: Initialize logging
+    log_format = "json" if settings.environment == "production" else settings.log_format
+    setup_logging(log_format=log_format, log_level=settings.log_level)
+
+    logger.info(
+        "Application starting",
+        extra={
+            "environment": settings.environment,
+            "log_mode": settings.log_mode,
+            "log_format": log_format,
+            "log_level": settings.log_level,
+        },
+    )
+
+    yield
+
+    # Shutdown
+    logger.info("Application shutting down")
+
 
 app = FastAPI(
     title="Subtribe ATS",
     description="Multi-tenant Applicant Tracking System",
     version="1.0.0",
     debug=settings.debug,
+    lifespan=lifespan,  # Add lifespan event
     # Disable docs in production for security
     docs_url="/docs" if settings.environment != "production" else None,
     redoc_url="/redoc" if settings.environment != "production" else None,
@@ -49,13 +81,21 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# CORS
+# Middleware (order matters: last added = first executed)
+# 1. CORS (must be first)
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=settings.cors_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# 2. Logging middleware (executes for all requests)
+app.add_middleware(
+    LoggingMiddleware,
+    log_mode=settings.log_mode,
+    sampling_rate=settings.log_sampling_rate,
 )
 
 # Exception handlers

@@ -1,11 +1,14 @@
 """Custom exceptions and global exception handlers."""
 
+import logging
 from typing import Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
+
+logger = logging.getLogger(__name__)
 
 
 class AppException(Exception):
@@ -65,6 +68,24 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(AppException)
     async def app_exception_handler(request: Request, exc: AppException):
+        # Lazy import to avoid circular dependency
+        from app.dependencies import get_correlation_id
+
+        # Log application exception
+        logger.warning(
+            f"Application error: {exc.__class__.__name__}",
+            extra={
+                "correlation_id": get_correlation_id(),
+                "exception_type": exc.__class__.__name__,
+                "code": exc.code,
+                "message": exc.message,
+                "status_code": exc.status_code,
+                "path": str(request.url.path),
+                "method": request.method,
+                "details": exc.details,
+            },
+        )
+
         return JSONResponse(
             status_code=exc.status_code,
             content={
@@ -79,6 +100,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        # Lazy import to avoid circular dependency
+        from app.dependencies import get_correlation_id
+
         # Clean up errors to make them JSON serializable
         errors = []
         for error in exc.errors():
@@ -91,6 +115,19 @@ def register_exception_handlers(app: FastAPI) -> None:
             if "input" in error:
                 error_dict["input"] = str(error["input"])
             errors.append(error_dict)
+
+        # Log validation error
+        logger.warning(
+            "Request validation failed",
+            extra={
+                "correlation_id": get_correlation_id(),
+                "exception_type": "RequestValidationError",
+                "status_code": status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "path": str(request.url.path),
+                "method": request.method,
+                "validation_errors": errors,
+            },
+        )
 
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -111,6 +148,25 @@ def register_exception_handlers(app: FastAPI) -> None:
         Most database errors should be caught and converted to proper exceptions
         in the endpoint/service layer.
         """
+        # Lazy import to avoid circular dependency
+        from app.dependencies import get_correlation_id
+
+        raw_error = str(exc.orig) if hasattr(exc, "orig") else str(exc)
+
+        # Log database integrity error
+        logger.error(
+            "Database integrity error (unhandled)",
+            extra={
+                "correlation_id": get_correlation_id(),
+                "exception_type": "IntegrityError",
+                "status_code": status.HTTP_409_CONFLICT,
+                "path": str(request.url.path),
+                "method": request.method,
+                "raw_error": raw_error,
+            },
+            exc_info=True,  # Include traceback
+        )
+
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content={
@@ -121,13 +177,30 @@ def register_exception_handlers(app: FastAPI) -> None:
                         "Database constraint violation. "
                         "This error should be handled in the endpoint."
                     ),
-                    "details": {"raw_error": str(exc.orig) if hasattr(exc, "orig") else str(exc)},
+                    "details": {"raw_error": raw_error},
                 }
             },
         )
 
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception):
+        # Lazy import to avoid circular dependency
+        from app.dependencies import get_correlation_id
+
+        # Log unexpected exception with full traceback
+        logger.error(
+            f"Unexpected error: {exc.__class__.__name__}",
+            extra={
+                "correlation_id": get_correlation_id(),
+                "exception_type": exc.__class__.__name__,
+                "exception_message": str(exc),
+                "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "path": str(request.url.path),
+                "method": request.method,
+            },
+            exc_info=True,  # Include full traceback
+        )
+
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_correlation_id, get_current_user
 from app.exceptions import AppException, ConflictError, NotFoundError
 from app.models.application import Application
 from app.models.job import Job
@@ -183,13 +183,37 @@ async def submit_application(
     except Exception as e:
         # Upload failed - rollback
         await db.rollback()
-        logger.error(f"Application creation failed: {str(e)}")
+        logger.error(
+            "Application creation failed",
+            extra={
+                "correlation_id": get_correlation_id(),
+                "event_type": "business",
+                "event": "application_creation_failed",
+                "job_id": str(job.id),
+                "email": email,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
         raise AppException(
             message="Failed to upload resume. Please try again.",
             code="upload_failed",
             status_code=503,
         ) from e
-    logger.info(f"Application submitted: {application.id} for job {job.id} by {email}")
+
+    logger.info(
+        "Application submitted successfully",
+        extra={
+            "correlation_id": get_correlation_id(),
+            "event_type": "business",
+            "event": "application_submitted",
+            "application_id": str(application.id),
+            "job_id": str(job.id),
+            "email": email,
+            "first_name": first_name,
+            "last_name": last_name,
+        },
+    )
 
     return ApplicationSubmitted(id=application.id)
 
@@ -272,7 +296,19 @@ async def get_resume_view_url(
             expires_at=expires_at,
         )
     except Exception as e:
-        logger.error(f"Failed to generate view URL: {str(e)}")
+        logger.error(
+            "Failed to generate resume view URL",
+            extra={
+                "correlation_id": get_correlation_id(),
+                "event_type": "external_service",
+                "service": "gcs",
+                "operation": "generate_view_url",
+                "application_id": str(application_id),
+                "gcs_uri": application.resume_url,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
         raise AppException(
             message="Failed to generate resume URL", code="url_generation_failed", status_code=503
         ) from e
@@ -316,7 +352,19 @@ async def get_resume_download_url(
             expires_at=expires_at,
         )
     except Exception as e:
-        logger.error(f"Failed to generate download URL: {str(e)}")
+        logger.error(
+            "Failed to generate resume download URL",
+            extra={
+                "correlation_id": get_correlation_id(),
+                "event_type": "external_service",
+                "service": "gcs",
+                "operation": "generate_download_url",
+                "application_id": str(application_id),
+                "gcs_uri": application.resume_url,
+                "error": str(e),
+            },
+            exc_info=True,
+        )
         raise AppException(
             message="Failed to generate resume download URL",
             code="url_generation_failed",
@@ -377,13 +425,29 @@ async def update_application_status(
         await db.refresh(application)
 
         logger.info(
-            f"Application {application_id} status updated: {old_status} -> {data.status} "
-            f"by user {current_user['user_id']}"
+            "Application status updated",
+            extra={
+                "correlation_id": get_correlation_id(),
+                "event_type": "business",
+                "event": "application_status_updated",
+                "application_id": str(application_id),
+                "job_id": str(application.job_id),
+                "from_status": old_status,
+                "to_status": data.status,
+                "changed_by": str(current_user["user_id"]),
+            },
         )
     else:
         # Status unchanged - no history entry needed
         logger.info(
-            f"Application {application_id} status unchanged ({old_status}), no history created"
+            "Application status unchanged",
+            extra={
+                "correlation_id": get_correlation_id(),
+                "event_type": "business",
+                "event": "application_status_unchanged",
+                "application_id": str(application_id),
+                "status": old_status,
+            },
         )
 
     # Build response
