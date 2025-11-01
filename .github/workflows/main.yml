@@ -214,22 +214,35 @@ jobs:
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:latest
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ github.sha }}
 
-      # Step 9: Decode CORS variable from base64
-      # REASON: GitHub Actions masks curly braces {1,3} in regex patterns as secrets
-      # Base64 encoding bypasses this false-positive masking
-      - name: Decode CORS variable
+      # Step 9: Create environment variables YAML file
+      # REASON: Proper handling of special characters in env vars (regex patterns, etc.)
+      # YAML files handle special characters natively without shell escaping issues
+      - name: Create env vars file
         run: |
-          echo "🔓 Decoding CORS_ALLOWED_ORIGINS_B64 from base64..."
-          CORS_DECODED=$(echo "${{ vars.CORS_ALLOWED_ORIGINS_B64 }}" | base64 --decode)
-          echo "CORS_ALLOWED_ORIGINS=$CORS_DECODED" >> $GITHUB_ENV
-          echo "✅ CORS pattern decoded and set in environment"
-          echo "📋 Actual CORS pattern: $CORS_DECODED"
+          cat > env-vars.yaml <<'EOF'
+          ENVIRONMENT: ${{ steps.deployment_target.outputs.env_name }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          JWT_ALGORITHM: HS256
+          JWT_EXPIRY_DAYS: "15"
+          REFRESH_TOKEN_EXPIRY_DAYS: "30"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+          GCS_PROJECT_ID: ${{ vars.GCS_PROJECT_ID }}
+          CORS_ALLOWED_ORIGINS: $CORS_ALLOWED_ORIGINS
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcs-key.json
+          EOF
+          echo "✅ Environment variables file created"
+          echo "🔒 CORS pattern included in YAML file"
+        env:
+          CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS }}
+
 
       # Step 10: Deploy to Cloud Run
-      # REASON: Use dynamic service_name, env_name, and version
-      # OLD: Always deployed to subtribe-ats-api-dev with ENVIRONMENT=development
-      # NEW: Deploys to dev or prod based on branch
-      # IMPORTANT: Mounts GCS service account key as secret for signed URL generation
+      # REASON: Use env-vars-file for proper handling of special characters
       - name: Deploy to Cloud Run
         run: |
           VERSION_TAG="${{ steps.tag_version.outputs.new_tag || github.sha }}"
@@ -241,7 +254,7 @@ jobs:
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --set-env-vars="ENVIRONMENT=${{ steps.deployment_target.outputs.env_name }},DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=HS256,JWT_EXPIRY_DAYS=15,REFRESH_TOKEN_EXPIRY_DAYS=30,SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ env.CORS_ALLOWED_ORIGINS }},GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcs-key.json" \
+            --env-vars-file=env-vars.yaml \
             --set-secrets="/tmp/gcs-key.json=gcs-credentials:latest" \
             --service-account=subtribe-ats-storage@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --memory=512Mi \
