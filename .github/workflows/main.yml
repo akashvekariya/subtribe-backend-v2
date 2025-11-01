@@ -214,22 +214,16 @@ jobs:
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:latest
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ steps.deployment_target.outputs.service_name }}:${{ github.sha }}
 
-      # Step 9: Debug - Print CORS variable
-      # REASON: Debug what's actually in the CORS_ALLOWED_ORIGINS variable
-      - name: Debug CORS variable
+      # Step 9: Decode CORS variable from base64
+      # REASON: GitHub Actions masks curly braces {1,3} in regex patterns as secrets
+      # Base64 encoding bypasses this false-positive masking
+      - name: Decode CORS variable
         run: |
-          echo "🔍 Debugging CORS_ALLOWED_ORIGINS variable..."
-          echo "Raw value: ${{ vars.CORS_ALLOWED_ORIGINS }}"
-          echo "---"
-          echo "Length: ${#CORS_VAR}"
-          CORS_VAR="${{ vars.CORS_ALLOWED_ORIGINS }}"
-          echo "Stored in bash variable: $CORS_VAR"
-          echo "---"
-          echo "Character by character (first 50 chars):"
-          echo "$CORS_VAR" | head -c 50 | od -c
-          echo "---"
-          echo "Testing with printf:"
-          printf "CORS value: %s\n" "${{ vars.CORS_ALLOWED_ORIGINS }}"
+          echo "🔓 Decoding CORS_ALLOWED_ORIGINS_B64 from base64..."
+          CORS_DECODED=$(echo "${{ vars.CORS_ALLOWED_ORIGINS_B64 }}" | base64 --decode)
+          echo "CORS_ALLOWED_ORIGINS=$CORS_DECODED" >> $GITHUB_ENV
+          echo "✅ CORS pattern decoded and set in environment"
+          echo "📋 Actual CORS pattern: $CORS_DECODED"
 
       # Step 10: Deploy to Cloud Run
       # REASON: Use dynamic service_name, env_name, and version
@@ -247,7 +241,7 @@ jobs:
             --region=${{ env.REGION }} \
             --platform=managed \
             --allow-unauthenticated \
-            --set-env-vars="ENVIRONMENT=${{ steps.deployment_target.outputs.env_name }},DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=HS256,JWT_EXPIRY_DAYS=15,REFRESH_TOKEN_EXPIRY_DAYS=30,SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }},GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcs-key.json" \
+            --set-env-vars="ENVIRONMENT=${{ steps.deployment_target.outputs.env_name }},DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=HS256,JWT_EXPIRY_DAYS=15,REFRESH_TOKEN_EXPIRY_DAYS=30,SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ env.CORS_ALLOWED_ORIGINS }},GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcs-key.json" \
             --set-secrets="/tmp/gcs-key.json=gcs-credentials:latest" \
             --service-account=subtribe-ats-storage@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --memory=512Mi \
