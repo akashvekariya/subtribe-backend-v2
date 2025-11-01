@@ -30,7 +30,7 @@ if "+asyncpg" in settings.database_url or "+psycopg" in settings.database_url:
 
     engine = create_async_engine(
         settings.database_url,
-        echo=settings.debug,
+        echo=False,  # Don't log SQL queries (use our logging middleware instead)
         pool_pre_ping=True,
         pool_size=5,
         max_overflow=10,

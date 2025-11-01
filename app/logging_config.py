@@ -377,4 +377,24 @@ def setup_logging(log_format: str = "json", log_level: str = "INFO"):
     # Suppress noisy third-party loggers
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("google").setLevel(logging.WARNING)
+    logging.getLogger("google.auth").setLevel(logging.WARNING)
+    logging.getLogger("google.cloud").setLevel(logging.WARNING)
     logging.getLogger("asyncio").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+    # CRITICAL: Suppress SQLAlchemy query logging (extremely verbose)
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.orm").setLevel(logging.WARNING)
+
+    # Suppress uvicorn access logs (we have our own middleware logging)
+    # Note: Also run uvicorn with --no-access-log flag for complete suppression
+    logging.getLogger("uvicorn").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.error").setLevel(logging.INFO)  # Keep errors visible
+
+    # Suppress FastAPI/Starlette internal logs
+    logging.getLogger("fastapi").setLevel(logging.WARNING)
+    logging.getLogger("starlette").setLevel(logging.WARNING)
