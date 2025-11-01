@@ -11,7 +11,7 @@ See vibe-plan/logging.md for complete documentation.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from app.dependencies import get_correlation_id
 from app.logging_config import mask_sensitive_data as _mask_sensitive_data
@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 def log_business_event(
     event: str,
     description: str,
-    user_id: Optional[str] = None,
-    company_id: Optional[str] = None,
-    resource_id: Optional[str] = None,
-    resource_type: Optional[str] = None,
-    metadata: Optional[dict] = None,
+    user_id: str | None = None,
+    company_id: str | None = None,
+    resource_id: str | None = None,
+    resource_type: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ):
     """Log a business-level event.
 
@@ -80,13 +80,13 @@ def log_business_event(
 def log_security_event(
     event: str,
     description: str,
-    user_id: Optional[str] = None,
-    company_id: Optional[str] = None,
-    ip_address: Optional[str] = None,
-    user_agent: Optional[str] = None,
+    user_id: str | None = None,
+    company_id: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
     success: bool = True,
-    reason: Optional[str] = None,
-    metadata: Optional[dict] = None,
+    reason: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ):
     """Log a security-related event.
 
@@ -161,8 +161,8 @@ def log_performance_event(
     operation: str,
     duration_ms: int,
     success: bool = True,
-    resource_count: Optional[int] = None,
-    metadata: Optional[dict] = None,
+    resource_count: int | None = None,
+    metadata: dict[str, Any] | None = None,
 ):
     """Log a performance-related event.
 
@@ -232,9 +232,9 @@ def log_external_service_call(
     operation: str,
     duration_ms: int,
     success: bool = True,
-    status_code: Optional[int] = None,
-    error: Optional[str] = None,
-    metadata: Optional[dict] = None,
+    status_code: int | None = None,
+    error: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ):
     """Log an external service call.
 
@@ -297,9 +297,9 @@ def log_database_event(
     operation: str,
     table: str,
     duration_ms: int,
-    record_count: Optional[int] = None,
+    record_count: int | None = None,
     success: bool = True,
-    error: Optional[str] = None,
+    error: str | None = None,
 ):
     """Log a database operation.
 

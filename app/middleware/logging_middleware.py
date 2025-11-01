@@ -15,7 +15,6 @@ import logging
 import random
 import time
 import uuid
-from typing import Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -233,7 +232,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         return data
 
-    def _get_user_context(self, request: Request) -> Optional[dict]:
+    def _get_user_context(self, request: Request) -> dict | None:
         """Extract user context from request state.
 
         User context is added by get_current_user dependency.
@@ -254,7 +253,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             }
         return None
 
-    async def _read_request_body(self, request: Request) -> Optional[dict]:
+    async def _read_request_body(self, request: Request) -> dict | None:
         """Read and parse request body.
 
         Attempts to parse as JSON. Returns None if not JSON or empty.
@@ -285,7 +284,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             # If parsing fails, don't log body
             return None
 
-    async def _read_response_body(self, response: Response) -> Optional[dict]:
+    async def _read_response_body(self, response: Response) -> dict | None:
         """Read and parse response body.
 
         Attempts to parse as JSON. Returns None if not JSON or empty.

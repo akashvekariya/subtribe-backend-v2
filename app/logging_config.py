@@ -61,10 +61,11 @@ def mask_sensitive_data(data: Any, depth: int = 0) -> Any:
         for key, value in data.items():
             key_lower = key.lower()
             # Check if field should be masked
-            if any(sensitive in key_lower for sensitive in SENSITIVE_FIELDS):
-                if not any(keep in key_lower for keep in KEEP_FIELDS):
-                    masked[key] = "***REDACTED***"
-                    continue
+            should_mask = any(sensitive in key_lower for sensitive in SENSITIVE_FIELDS)
+            should_keep = any(keep in key_lower for keep in KEEP_FIELDS)
+            if should_mask and not should_keep:
+                masked[key] = "***REDACTED***"
+                continue
             # Recursively mask nested structures
             masked[key] = mask_sensitive_data(value, depth + 1)
         return masked
