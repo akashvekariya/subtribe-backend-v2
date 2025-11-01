@@ -19,8 +19,19 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan events (startup and shutdown)."""
     # Startup: Initialize logging
-    log_format = "json" if settings.environment == "production" else settings.log_format
-    setup_logging(log_format=log_format, log_level=settings.log_level)
+    # Use JSON format for any cloud deployment (cleaner, no color codes)
+    # Use console format only for local development (colored output in terminal)
+    # Detection: K_SERVICE (GCP Cloud Run) or AWS_EXECUTION_ENV (AWS Lambda/ECS)
+    import os
+
+    is_cloud_deployment = os.getenv("K_SERVICE") or os.getenv("AWS_EXECUTION_ENV")
+    log_format = "json" if is_cloud_deployment else settings.log_format
+
+    setup_logging(
+        log_format=log_format,
+        log_level=settings.log_level,
+        third_party_log_level=settings.third_party_log_level,
+    )
 
     logger.info(
         "Application starting",
@@ -89,6 +100,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    max_age=3600,  # Cache preflight responses for 1 hour (reduces OPTIONS spam)
 )
 
 # 2. Logging middleware (executes for all requests)

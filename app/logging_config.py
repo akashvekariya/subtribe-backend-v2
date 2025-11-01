@@ -348,19 +348,36 @@ class ColoredConsoleFormatter(logging.Formatter):
         return " | ".join(parts)
 
 
-def setup_logging(log_format: str = "json", log_level: str = "INFO"):
-    """Setup logging configuration.
+def setup_logging(
+    log_format: str = "json",
+    log_level: str = "INFO",
+    third_party_log_level: str = "WARNING",
+):
+    """Setup logging configuration with whitelist approach.
+
+    Strategy:
+    1. Set root logger to third_party_log_level (WARNING) - suppresses ALL libraries
+    2. Whitelist our app loggers (app.*) to log_level (INFO/DEBUG)
+    3. Explicitly suppress known verbose libraries for extra safety
+
+    This ensures ANY new third-party library is automatically suppressed,
+    preventing verbose logging from unexpected sources.
 
     Args:
         log_format: "json" for production, "console" for development
-        log_level: Minimum log level (DEBUG, INFO, WARNING, ERROR)
+        log_level: Minimum log level for OUR app loggers (DEBUG, INFO, WARNING, ERROR)
+        third_party_log_level: Log level for ALL third-party libraries (default: WARNING)
     """
-    # Get root logger
-    logger = logging.getLogger()
-    logger.setLevel(getattr(logging, log_level.upper()))
+    # ============================================================================
+    # STEP 1: Configure root logger (affects ALL loggers by default)
+    # ============================================================================
+    # Set root logger to third_party_log_level (WARNING by default)
+    # This automatically suppresses ALL third-party libraries
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, third_party_log_level.upper()))
 
     # Remove existing handlers
-    logger.handlers.clear()
+    root_logger.handlers.clear()
 
     # Create handler (stdout for Cloud Run compatibility)
     handler = logging.StreamHandler(sys.stdout)
@@ -372,29 +389,47 @@ def setup_logging(log_format: str = "json", log_level: str = "INFO"):
         formatter = ColoredConsoleFormatter()
 
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    root_logger.addHandler(handler)
 
-    # Suppress noisy third-party loggers
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("google").setLevel(logging.WARNING)
-    logging.getLogger("google.auth").setLevel(logging.WARNING)
-    logging.getLogger("google.cloud").setLevel(logging.WARNING)
-    logging.getLogger("asyncio").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    # ============================================================================
+    # STEP 2: Whitelist our application loggers
+    # ============================================================================
+    # Enable our app loggers to the configured log_level (INFO/DEBUG)
+    # All loggers starting with "app." will log at this level
+    app_logger = logging.getLogger("app")
+    app_logger.setLevel(getattr(logging, log_level.upper()))
 
-    # CRITICAL: Suppress SQLAlchemy query logging (extremely verbose)
+    # ============================================================================
+    # STEP 3: Explicit suppressions for known problematic libraries
+    # ============================================================================
+    # Even though root logger suppresses everything, we explicitly set these
+    # for extra safety and documentation purposes
+
+    # Database & ORM (extremely verbose with query details)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.dialects").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.orm").setLevel(logging.WARNING)
 
-    # Suppress uvicorn access logs (we have our own middleware logging)
+    # Web Server (duplicate access logs)
     # Note: Also run uvicorn with --no-access-log flag for complete suppression
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.error").setLevel(logging.INFO)  # Keep errors visible
 
-    # Suppress FastAPI/Starlette internal logs
+    # HTTP Clients (verbose request/response details)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+    # Cloud Services (auth flows, API calls)
+    logging.getLogger("google").setLevel(logging.WARNING)
+    logging.getLogger("google.auth").setLevel(logging.WARNING)
+    logging.getLogger("google.cloud").setLevel(logging.WARNING)
+
+    # Framework Internals
     logging.getLogger("fastapi").setLevel(logging.WARNING)
     logging.getLogger("starlette").setLevel(logging.WARNING)
+
+    # System
+    logging.getLogger("asyncio").setLevel(logging.WARNING)

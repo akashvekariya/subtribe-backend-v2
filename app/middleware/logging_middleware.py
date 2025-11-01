@@ -67,20 +67,30 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         correlation_id = self._get_or_create_correlation_id(request)
         set_correlation_id(correlation_id)
 
-        # 2. Start timer
+        # 2. Skip logging for OPTIONS requests (CORS preflight)
+        # These are automatic browser checks, not actual API calls
+        # They add noise without business value (2x logs per request)
+        if request.method == "OPTIONS":
+            response = await call_next(request)
+            # Still add correlation ID header for consistency
+            if isinstance(response, StreamingResponse):
+                response.headers["X-Request-ID"] = correlation_id
+            return response
+
+        # 3. Start timer
         start_time = time.time()
 
-        # 3. Find matching logging rule for this path
+        # 4. Find matching logging rule for this path
         path = request.url.path
         rule = find_matching_rule(path)
 
-        # 4. Determine if we should log (sampling)
+        # 5. Determine if we should log (sampling)
         should_log = self._should_log_request(rule)
 
-        # 5. Capture request data
+        # 6. Capture request data
         request_data = await self._capture_request(request, rule)
 
-        # 6. Process request
+        # 7. Process request
         try:
             response = await call_next(request)
         except Exception as exc:
@@ -94,20 +104,20 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             )
             raise  # Re-raise to be handled by exception handlers
 
-        # 7. Calculate duration
+        # 8. Calculate duration
         duration_ms = int((time.time() - start_time) * 1000)
 
-        # 8. Capture response data
+        # 9. Capture response data
         response_data = await self._capture_response(response, rule)
 
-        # 9. Determine effective log mode (rule can override global)
+        # 10. Determine effective log mode (rule can override global)
         effective_mode = rule.get("mode") or self.log_mode
 
-        # 10. Determine log level based on status code
+        # 11. Determine log level based on status code
         status_code = response.status_code
         log_level = determine_log_level(effective_mode, status_code)
 
-        # 11. Log consolidated entry (if sampling allows)
+        # 12. Log consolidated entry (if sampling allows)
         # Always log errors, even if sampling would skip
         if should_log or status_code >= 400:
             self._log_request_response(
@@ -120,7 +130,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 rule=rule,
             )
 
-        # 12. Add correlation ID to response headers
+        # 13. Add correlation ID to response headers
         response.headers["X-Request-ID"] = correlation_id
 
         return response

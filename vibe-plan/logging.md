@@ -23,7 +23,8 @@
 13. [Testing Guide](#testing-guide)
 14. [Troubleshooting](#troubleshooting)
 15. [Best Practices](#best-practices)
-16. [Migration Guide](#migration-guide)
+16. [Third-Party Logger Suppression](#third-party-logger-suppression)
+17. [Migration Guide](#migration-guide)
 
 ---
 
@@ -1493,6 +1494,202 @@ LOG_SAMPLING_RATE=0.5  # Changed 2025-11-10: Traffic spike, temporary reduction
 
 ---
 
+## Third-Party Logger Suppression
+
+### Problem: Verbose Third-Party Libraries
+
+Third-party libraries (SQLAlchemy, uvicorn, httpx, etc.) can flood logs with verbose output:
+- **SQLAlchemy**: Raw SQL queries with parameter binding
+- **Uvicorn**: Duplicate HTTP access logs
+- **HTTP Clients**: Request/response details
+- **Cloud SDKs**: Auth flows and API calls
+
+**Example of problematic output:**
+```
+2025-11-01 19:46:04.897 IST WHERE jobs.slug = $1::VARCHAR
+2025-11-01 19:46:04.897 IST SELECT companies.id AS companies_id...
+INFO:     127.0.0.1:58401 - "GET /health HTTP/1.1" 200 OK
+2025-11-01 19:49:09 | INFO | correlation_id=eb9ef59f... | GET /docs | ...
+INFO:     127.0.0.1:58453 - "GET /docs HTTP/1.1" 200 OK
+```
+
+### Solution: Whitelist Approach
+
+We use a **whitelist-based strategy** that automatically suppresses ALL third-party libraries:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ ROOT LOGGER (WARNING)                                        │
+│ ↓ Suppresses ALL loggers by default                         │
+│                                                               │
+│  ┌──────────────────────────────────────────┐               │
+│  │ WHITELIST: app.* (INFO)                  │               │
+│  │ ↓ Only OUR application logs are visible │               │
+│  │                                          │               │
+│  │  ✅ app.main                             │               │
+│  │  ✅ app.routers.jobs                     │               │
+│  │  ✅ app.services.storage                 │               │
+│  │  ✅ app.middleware.logging_middleware    │               │
+│  └──────────────────────────────────────────┘               │
+│                                                               │
+│  ❌ sqlalchemy.* (WARNING)  ← Suppressed                    │
+│  ❌ uvicorn.* (WARNING)     ← Suppressed                    │
+│  ❌ httpx.* (WARNING)       ← Suppressed                    │
+│  ❌ google.* (WARNING)      ← Suppressed                    │
+│  ❌ ANY_NEW_LIBRARY.* (WARNING) ← Automatically suppressed  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### How It Works
+
+1. **Set root logger to WARNING** - Suppresses everything by default
+2. **Whitelist `app.*` loggers to INFO** - Only our code logs at INFO level
+3. **Configure via env variable** - `THIRD_PARTY_LOG_LEVEL=WARNING`
+4. **Explicit suppressions for safety** - Double-protection for known noisy libraries
+
+### Configuration
+
+Add to `.env.development` or `.env.production`:
+
+```bash
+# Level for OUR app loggers (app.*): DEBUG, INFO, WARNING, ERROR
+LOG_LEVEL=INFO
+
+# Level for ALL third-party libraries: DEBUG, INFO, WARNING, ERROR
+# WARNING = suppress everything except warnings/errors (recommended)
+THIRD_PARTY_LOG_LEVEL=WARNING
+```
+
+### Adjusting Third-Party Log Levels
+
+**Normal operation** (recommended):
+```bash
+THIRD_PARTY_LOG_LEVEL=WARNING  # Suppress INFO/DEBUG from all libraries
+```
+
+**Debugging third-party library issues**:
+```bash
+THIRD_PARTY_LOG_LEVEL=DEBUG    # Show ALL logs (very verbose!)
+```
+
+**Emergency cost control**:
+```bash
+THIRD_PARTY_LOG_LEVEL=ERROR    # Only show errors (minimal logging)
+```
+
+### Debugging Specific Libraries
+
+If you need to debug a specific library without enabling all third-party logs, add a temporary override in `app/logging_config.py`:
+
+```python
+def setup_logging(...):
+    # ... existing setup ...
+
+    # TEMPORARY: Debug specific library
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
+    # Remember to remove after debugging!
+```
+
+### Implementation Details
+
+**Files Modified:**
+1. `app/config.py` - Added `third_party_log_level` setting
+2. `app/logging_config.py` - Whitelist approach with root logger
+3. `app/main.py` - Pass `third_party_log_level` to setup
+4. `app/database.py` - Disabled SQLAlchemy echo
+5. `Dockerfile` - Added `--no-access-log` flag to uvicorn
+6. `.env.development` - Added `THIRD_PARTY_LOG_LEVEL=WARNING`
+7. `.env.production` - Added `THIRD_PARTY_LOG_LEVEL=WARNING`
+
+**Key Code in `app/logging_config.py`:**
+```python
+def setup_logging(
+    log_format: str = "json",
+    log_level: str = "INFO",
+    third_party_log_level: str = "WARNING",
+):
+    # Step 1: Set root logger to WARNING (suppresses everything)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, third_party_log_level.upper()))
+
+    # Step 2: Whitelist our app loggers to INFO
+    app_logger = logging.getLogger("app")
+    app_logger.setLevel(getattr(logging, log_level.upper()))
+
+    # Step 3: Explicit suppressions for safety
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    # ... etc
+```
+
+### Benefits
+
+✅ **Future-proof**: Any new library is automatically suppressed
+✅ **Configurable**: Change `THIRD_PARTY_LOG_LEVEL` to DEBUG if needed
+✅ **Simple**: One setting controls all third-party libraries
+✅ **Safe**: Explicit suppressions provide defense-in-depth
+✅ **Maintainable**: No need to hunt down new verbose libraries
+
+### Suppressed Libraries
+
+**Automatically suppressed by root logger:**
+- **Database & ORM**: sqlalchemy (engine, pool, dialects, orm), psycopg2, asyncpg
+- **Web Server**: uvicorn, gunicorn, hypercorn
+- **HTTP Clients**: httpx, httpcore, urllib3, requests, aiohttp
+- **Cloud Services**: google, google.auth, google.cloud, boto3, azure-sdk
+- **Framework Internals**: fastapi, starlette
+- **System**: asyncio
+- **Any future library you add** ✅
+
+### Testing
+
+To verify the whitelist approach is working:
+
+```bash
+# Start server
+uvicorn app.main:app --no-access-log --reload
+
+# Make a request
+curl http://localhost:8000/docs
+
+# Expected output (clean, single line):
+2025-11-01 20:34:46 | INFO | correlation_id=18d2aa99... | GET /docs | status=200 | duration=0ms | Request completed: GET /docs
+
+# Should NOT see:
+# ❌ SQL queries (SELECT companies.id...)
+# ❌ Uvicorn access logs (INFO: 127.0.0.1:58401 - "GET /docs...")
+# ❌ HTTP client logs (httpx: GET /docs)
+# ❌ Any other third-party noise
+```
+
+### Troubleshooting
+
+**Problem: Still seeing third-party logs**
+
+1. Check `THIRD_PARTY_LOG_LEVEL` is set to WARNING
+2. Check no explicit overrides in code
+3. Restart server to apply changes
+
+**Problem: Can't debug a library issue**
+
+Temporarily enable:
+```bash
+THIRD_PARTY_LOG_LEVEL=DEBUG  # ⚠️ Very verbose, temporary only!
+```
+
+Or enable specific logger:
+```python
+# In logging_config.py (temporary)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
+```
+
+**Problem: Uvicorn access logs still showing**
+
+1. Add `--no-access-log` flag when starting uvicorn
+2. Check Dockerfile has the flag (for production)
+
+---
+
 ## Migration Guide
 
 ### Current State
@@ -1635,6 +1832,14 @@ LOG_MODE=minimal # Metadata only
 **Add sampling:**
 ```bash
 LOG_SAMPLING_RATE=0.5  # Log 50%
+```
+
+**Control third-party logs:**
+```bash
+LOG_LEVEL=INFO                # Your app logs (app.*)
+THIRD_PARTY_LOG_LEVEL=WARNING # All libraries (default)
+THIRD_PARTY_LOG_LEVEL=DEBUG   # Debug library issues (verbose!)
+THIRD_PARTY_LOG_LEVEL=ERROR   # Emergency cost control
 ```
 
 **Search logs:**
