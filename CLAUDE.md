@@ -28,16 +28,16 @@ This document defines:
 
 **When you first join** (user provides this file):
 1. Read this file completely (5 min read)
-2. Check current status in [`progress.md`](./vibe-plan/progress.md)
+2. Check current status in [`progress.md`](./docs-archive/vibe-plan/progress.md)
 3. Ask user: "I see we're in Phase X, task Y. Should I proceed with Z?"
 4. User confirms → You execute → Update progress.md
 
 **Daily workflow** (user asks for help):
 1. **READ [`AI_CODING_STANDARDS.md`](./AI_CODING_STANDARDS.md) first** - Coding methodology & quality standards ⭐
-2. Check [`progress.md`](./vibe-plan/progress.md) - What's done? What's next?
-3. Check [`plan.md`](./vibe-plan/plan.md) - What does current phase require?
+2. Check [`progress.md`](./docs-archive/vibe-plan/progress.md) - What's done? What's next?
+3. Check [`plan.md`](./docs-archive/vibe-plan/plan.md) - What does current phase require?
 4. Execute task (write code, run commands, test)
-5. Update [`progress.md`](./vibe-plan/progress.md) - Check off completed tasks
+5. Update [`progress.md`](./docs-archive/vibe-plan/progress.md) - Check off completed tasks
 6. Commit changes, inform user
 
 **IMPORTANT**: Always follow the standards in `AI_CODING_STANDARDS.md` - it defines when to stop, how to test, and production-grade code requirements.
@@ -89,37 +89,37 @@ You:
 
 ### Core Files (Read in Order)
 
-**1. [PRD.md](./vibe-plan/PRD.md)** - Product Requirements
+**1. [PRD.md](./docs-archive/vibe-plan/PRD.md)** - Product Requirements
 - **What**: Features, constraints, success criteria
 - **When to read**: First time, or when unclear about product scope
 - **Example**: "Should we implement real-time notifications?" → Check PRD (deferred to V2)
 
-**2. [plan.md](./vibe-plan/plan.md)** - Implementation Roadmap
+**2. [plan.md](./docs-archive/vibe-plan/plan.md)** - Implementation Roadmap
 - **How**: 10 phases (Phase 0-10) with detailed tasks
 - **When to read**: Starting new phase, or stuck on "what to build next"
 - **Example**: Phase 3 has all auth endpoints with step-by-step instructions
 
-**3. [progress.md](./vibe-plan/progress.md)** ⭐ **CHECK THIS FIRST**
+**3. [progress.md](./docs-archive/vibe-plan/progress.md)** ⭐ **CHECK THIS FIRST**
 - **Status**: Current phase, completed tasks, blockers
 - **When to read**: EVERY TIME before starting work
 - **Example**: "Phase 3: Auth - [x] /auth/register, [ ] /auth/login" → Do /auth/login next
 
 ### Reference Files (Consult During Implementation)
 
-**[api-design.md](./vibe-plan/api-design.md)** - API Specifications
+**[api-design.md](./docs-archive/vibe-plan/api-design.md)** - API Specifications
 - 20+ endpoints with request/response schemas
 - Use when: Implementing endpoints (exact schemas, validation rules)
 
-**[database.md](./vibe-plan/database.md)** - Database Schema
+**[database.md](./docs-archive/vibe-plan/database.md)** - Database Schema
 - 6 tables with relationships, indexes, constraints
 - Use when: Creating models, writing queries
 
-**[setup-reference.md](./vibe-plan/setup-reference.md)** - Setup & Code Patterns
+**[setup-reference.md](./docs-archive/vibe-plan/setup-reference.md)** - Setup & Code Patterns
 - Supabase/GCS/database setup commands
 - Code snippets (storage upload, transactions, auth)
 - Use when: Setting up services or need code examples
 
-**[error-handling.md](./vibe-plan/error-handling.md)** - Error Patterns
+**[error-handling.md](./docs-archive/vibe-plan/error-handling.md)** - Error Patterns
 - Global exception handlers, transaction patterns
 - Use when: Implementing error handling or debugging
 
@@ -131,7 +131,7 @@ You:
 **Status**: **PRODUCTION DEPLOYED & TESTED** 🚀  
 **Next Action**: Phase 10 - Pilot Launch (onboard first company, collect feedback)
 
-**Check**: Always read [`progress.md`](./vibe-plan/progress.md) for latest status before starting work.
+**Check**: Always read [`progress.md`](./docs-archive/vibe-plan/progress.md) for latest status before starting work.
 
 ---
 
@@ -387,8 +387,18 @@ SUPABASE_REFRESH_TOKEN_EXPIRY=2592000  # 30 days (Pro plan only, not used)
 # Backend JWT (generate new, different from Supabase)
 JWT_SECRET_KEY=generate-with-secrets.token_urlsafe(32)
 JWT_ALGORITHM=HS256
-JWT_EXPIRY_DAYS=15  # Our backend access token duration
+JWT_EXPIRY_DAYS=30  # Our backend access token duration (30 days = 2592000 seconds)
 REFRESH_TOKEN_EXPIRY_DAYS=30  # Our backend refresh token duration
+
+# Cookie Configuration (HTTP-only cookie authentication)
+# Development: false (localhost uses HTTP), Production: true (HTTPS only)
+COOKIE_SECURE=false
+# SameSite: Lax (CSRF protection), Strict, or None
+COOKIE_SAMESITE=Lax
+# Domain: empty for dev, .thesubtribe.com for production (cross-subdomain)
+COOKIE_DOMAIN=
+# Max age in seconds: 2592000 = 30 days (must match JWT_EXPIRY_DAYS)
+COOKIE_MAX_AGE=2592000
 
 # Google Cloud Storage
 GCS_BUCKET_NAME=subtribe-ats-resumes-dev
@@ -446,9 +456,9 @@ python scripts/test_gcs.py  # (create this script in Phase 6)
 ## When User Says "Continue" or "Keep Going"
 
 **Your workflow**:
-1. Read [`progress.md`](./vibe-plan/progress.md)
+1. Read [`progress.md`](./docs-archive/vibe-plan/progress.md)
 2. Find first unchecked `[ ]` task in current phase
-3. Read task details in [`plan.md`](./vibe-plan/plan.md)
+3. Read task details in [`plan.md`](./docs-archive/vibe-plan/plan.md)
 4. Ask: "Should I proceed with [task name]?"
 5. User confirms → Execute
 6. Update progress.md checkbox to `[x]`
@@ -490,9 +500,18 @@ You:
 
 ---
 
-**Last Updated**: 2025-10-29
-**Current Phase**: Phase 9 Complete ✅ - Production Deployed
+**Last Updated**: 2025-11-02
+**Current Phase**: Phase 9 Complete ✅ - Production Deployed & Ready
 **Next**: Phase 10 - Pilot Launch
+
+**Recent Changes (2025-11-02)**:
+- ✅ Updated JWT expiration to 30 days (from 15 days) for better UX
+- ✅ Added cookie configuration environment variables (COOKIE_SECURE, COOKIE_SAMESITE, COOKIE_DOMAIN, COOKIE_MAX_AGE)
+- ✅ Updated authentication endpoints to use config-based cookie settings
+- ✅ Configured production cookie domain (.thesubtribe.com) for cross-subdomain authentication
+- ✅ Maintained hybrid authentication (cookie priority, Authorization header fallback)
+- ✅ Updated documentation for cookie-based authentication
+- ✅ Backend production deployment readiness completed
 
 **Recent Changes (2025-10-29)**:
 - ✅ Created [`AI_CODING_STANDARDS.md`](./AI_CODING_STANDARDS.md) - Comprehensive coding methodology & quality standards
@@ -514,4 +533,4 @@ You:
 
 ---
 
-**Read [`progress.md`](./vibe-plan/progress.md) now to see current status and pick up where we left off.**
+**Read [`progress.md`](./docs-archive/vibe-plan/progress.md) now to see current status and pick up where we left off.**

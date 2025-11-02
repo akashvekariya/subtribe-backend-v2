@@ -78,7 +78,7 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "correlation_id": get_correlation_id(),
                 "exception_type": exc.__class__.__name__,
                 "code": exc.code,
-                "message": exc.message,
+                "error_message": exc.message,  # Renamed from 'message' to avoid LogRecord conflict
                 "status_code": exc.status_code,
                 "path": str(request.url.path),
                 "method": request.method,
