@@ -1,30 +1,31 @@
-name: CI/CD Pipeline
+name: Deploy to Production
 
-# Trigger on all pull requests and pushes to any branch
-# Deployment is controlled by job-level conditions (only main deploys)
+# Automatic deployment to Production on merges to main branch
 on:
-  push:  # All pushes trigger lint-test, only main deploys
-  workflow_dispatch:  # Allow manual triggering
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allow manual triggering if needed
 
-# Required for auto-versioning (create tags and releases)
+# Required for semantic versioning (create tags and releases)
 permissions:
   contents: write
 
 env:
   # GCP Configuration
   PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-  REGION: asia-south1  # Mumbai region
-  SERVICE_NAME: subtribe-ats-api-dev
-  IMAGE_NAME: subtribe-ats-backend
+  REGION: asia-south1 # Mumbai region
+  SERVICE_NAME: subtribe-backend-prod
+  ARTIFACT_REGISTRY_REPO: subtribe # Shared repo for all services
 
 jobs:
   # ============================================================================
-  # Job 1: Lint & Test (runs on all pushes/PRs)
+  # Job 1: Lint & Test (runs before Production deployment)
   # ============================================================================
   lint-test:
     name: Lint & Test
     runs-on: ubuntu-latest
-    
+
     steps:
       # Step 1: Checkout code
       - name: Checkout code
@@ -99,36 +100,36 @@ jobs:
           echo "   - Code formatting ✓"
           echo "   - Type checking ✓"
           echo "   - Unit tests (schemas & services) ✓"
-          echo ""
-          echo "Note: Database-dependent tests (test_models.py) run locally only."
 
   # ============================================================================
-  # Job 2: Deploy (runs ONLY on push to main, after lint-test succeeds)
+  # Job 2: Deploy to Production (after lint-test succeeds)
   # ============================================================================
-  deploy:
-    name: Build & Deploy to Cloud Run
+  deploy-prod:
+    name: Build & Deploy to Cloud Run (Production)
     runs-on: ubuntu-latest
-    needs: lint-test  # Wait for lint-test to pass
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'  # Deploy on push to main OR manual trigger
-    
+    needs: lint-test # Wait for lint-test to pass
+    # Use GitHub Environment for environment-specific secrets/variables
+    environment: Production
+
     steps:
       # Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for versioning
+          fetch-depth: 0 # Fetch all history for versioning
 
-      # Step 2: Bump version and create tag
+      # Step 2: Bump version and create tag (PRODUCTION ONLY)
+      # Creates semantic version tags (v1.0.0, v1.0.1, etc.)
       - name: Bump version and push tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: patch  # Default to patch if no conventional commit
+          default_bump: patch # Default to patch if no conventional commit
           release_branches: main
           tag_prefix: v
 
-      # Step 3: Create GitHub Release
+      # Step 3: Create GitHub Release (PRODUCTION ONLY)
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
@@ -151,64 +152,75 @@ jobs:
         run: |
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      # Step 7: Build Docker image with version tags
+      # Step 7: Build Docker image with Production build args
       - name: Build Docker image
         run: |
-          echo "🔨 Building Docker image version ${{ steps.tag_version.outputs.new_tag }}..."
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag }}"
+          echo "🔨 Building Docker image for Production..."
+          echo "📦 Version: $VERSION_TAG"
           docker build \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.tag_version.outputs.new_tag }} \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:latest \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$VERSION_TAG \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             .
 
       # Step 8: Push Docker image to Artifact Registry
       - name: Push Docker image
         run: |
-          echo "📦 Pushing Docker image with version ${{ steps.tag_version.outputs.new_tag }} to Artifact Registry..."
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.tag_version.outputs.new_tag }}
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:latest
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag }}"
+          echo "📦 Pushing Docker image with version $VERSION_TAG to Artifact Registry..."
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$VERSION_TAG
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
 
-      # Step 9: Deploy to Cloud Run
-      - name: Deploy to Cloud Run
+      # Step 9: Deploy to Cloud Run (Production)
+      - name: Deploy to Cloud Run (Production)
         run: |
-          echo "🚀 Deploying version ${{ steps.tag_version.outputs.new_tag }} to Cloud Run..."
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag }}"
+          echo "🚀 Deploying version $VERSION_TAG to Cloud Run (Production)..."
+          echo "🎯 Service: ${{ env.SERVICE_NAME }}"
+          echo "🌍 Environment: Production"
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.tag_version.outputs.new_tag }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$VERSION_TAG \
             --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
             --platform=managed \
             --allow-unauthenticated \
-            --set-env-vars="ENVIRONMENT=development,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=HS256,JWT_EXPIRY_DAYS=15,REFRESH_TOKEN_EXPIRY_DAYS=30,SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }}" \
-            --service-account=github-actions@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
+            --set-env-vars="ENVIRONMENT=production,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=${{ vars.JWT_ALGORITHM }},JWT_EXPIRY_DAYS=${{ vars.JWT_EXPIRY_DAYS }},REFRESH_TOKEN_EXPIRY_DAYS=${{ vars.REFRESH_TOKEN_EXPIRY_DAYS }},SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}" \
             --memory=512Mi \
             --cpu=1 \
             --timeout=60s \
+            --concurrency=80 \
             --max-instances=2 \
             --min-instances=0
 
       # Step 10: Get service URL
       - name: Get service URL
         run: |
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag }}"
           SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
             --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
             --format='value(status.url)')
           echo "✅ Deployment successful!"
           echo "🌐 Service URL: $SERVICE_URL"
-          echo "📦 Version: ${{ steps.tag_version.outputs.new_tag }}"
-          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "🎯 Service: ${{ env.SERVICE_NAME }}"
+          echo "🌍 Environment: Production"
+          echo "📦 Version: $VERSION_TAG"
 
       # Step 11: Run smoke test
       - name: Smoke test
         run: |
           SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
             --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
             --format='value(status.url)')
           echo "🔍 Running smoke test..."
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $SERVICE_URL/health)
+          # Accept 200 (OK)
           if [ $HTTP_CODE -eq 200 ]; then
-            echo "✅ Health check passed (HTTP $HTTP_CODE)"
+            echo "✅ Smoke test passed (HTTP $HTTP_CODE)"
           else
-            echo "❌ Health check failed (HTTP $HTTP_CODE)"
+            echo "❌ Smoke test failed (HTTP $HTTP_CODE)"
             exit 1
           fi
-
