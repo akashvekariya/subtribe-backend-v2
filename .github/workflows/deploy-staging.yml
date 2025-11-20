@@ -189,6 +189,12 @@ jobs:
             --max-instances=2 \
             --min-instances=0
 
+          echo "🔀 Routing 100% traffic to latest revision..."
+          gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+            --to-latest \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }}
+
       # Step 8: Get service URL
       - name: Get service URL
         run: |
