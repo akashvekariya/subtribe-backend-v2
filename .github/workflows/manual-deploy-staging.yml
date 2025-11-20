@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to deploy (leave empty to deploy current branch)'
+        description: 'Branch to deploy (leave empty to deploy current branch, e.g., "feature/new-api")'
         required: false
         default: ''
 
@@ -67,7 +67,7 @@ jobs:
         run: |
           echo "🔎 Running mypy type checker..."
           mypy app --ignore-missing-imports --check-untyped-defs
-        continue-on-error: true  # Don't fail build on type errors (warning only)
+        continue-on-error: true
 
       # Step 7: Run unit tests (schemas & services only - no DB needed)
       - name: Run unit tests
@@ -105,6 +105,8 @@ jobs:
           echo "   - Type checking ✓"
           echo "   - Unit tests (schemas & services) ✓"
 
+  ---
+
   # ============================================================================
   # Job 2: Manual Deploy to Staging (after lint-test succeeds)
   # ============================================================================
@@ -112,7 +114,6 @@ jobs:
     name: Build & Deploy to Cloud Run (Staging)
     runs-on: ubuntu-latest
     needs: lint-test # Wait for lint-test to pass
-    # Use GitHub Environment for environment-specific secrets/variables
     environment: Staging
 
     steps:
@@ -136,7 +137,7 @@ jobs:
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "sanitized_branch=$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
           echo "📌 Deploying branch: $BRANCH"
-
+      
       # Step 3: Authenticate with Google Cloud
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -156,8 +157,7 @@ jobs:
       - name: Build Docker image
         run: |
           echo "🔨 Building Docker image for Staging..."
-          echo "📦 Branch: ${{ steps.branch_name.outputs.branch }}"
-          echo "📦 Commit SHA: ${{ github.sha }}"
+          echo "📦 Branch Tag: ${{ steps.branch_name.outputs.sanitized_branch }}"
           docker build \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ steps.branch_name.outputs.sanitized_branch }} \
@@ -175,52 +175,18 @@ jobs:
       # Step 8: Deploy to Cloud Run (Staging)
       - name: Deploy to Cloud Run (Staging)
         run: |
-          VERSION_TAG="${{ steps.tag_version.outputs.new_tag }}"
-          echo "🚀 Deploying version $VERSION_TAG to Cloud Run (Staging)..."
+          # Use the sanitized branch name as the primary tag for deployment
+          DEPLOY_TAG="${{ steps.branch_name.outputs.sanitized_branch }}"
+          echo "🚀 Deploying branch tag $DEPLOY_TAG to Cloud Run (Staging)..."
           echo "🎯 Service: ${{ env.SERVICE_NAME }}"
           echo "🌍 Environment: Staging"
           
-          # Create environment variables file
-          cat > env-vars.yaml << EOF
-          ENVIRONMENT: "staging"
-          DATABASE_URL: "${{ secrets.DATABASE_URL }}"
-          JWT_SECRET_KEY: "${{ secrets.JWT_SECRET_KEY }}"
-          JWT_ALGORITHM: "${{ vars.JWT_ALGORITHM }}"
-          JWT_EXPIRY_DAYS: "${{ vars.JWT_EXPIRY_DAYS }}"
-          REFRESH_TOKEN_EXPIRY_DAYS: "${{ vars.REFRESH_TOKEN_EXPIRY_DAYS }}"
-          SUPABASE_URL: "${{ vars.SUPABASE_URL }}"
-          SUPABASE_ANON_KEY: "${{ vars.SUPABASE_ANON_KEY }}"
-          SUPABASE_SERVICE_KEY: "${{ secrets.SUPABASE_SERVICE_KEY }}"
-          SUPABASE_JWT_SECRET: "${{ secrets.SUPABASE_JWT_SECRET }}"
-          GCS_BUCKET_NAME: "${{ vars.GCS_BUCKET_NAME }}"
-          GCS_PROJECT_ID: "${{ vars.GCS_PROJECT_ID }}"
-          CORS_ALLOWED_ORIGINS: "${{ vars.ALLOWED_ORIGINS }}"
-          EOF
-          
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$VERSION_TAG \
-            --region=${{ env.REGION }} \
-            --project=${{ env.PROJECT_ID }} \
-            --platform=managed \
-            --allow-unauthenticated \
-            --env-vars-file=env-vars.yaml \
-            --memory=512Mi \
-            --cpu=1 \
-            --timeout=60s \
-            --concurrency=80 \
-            --max-instances=2 \
-            --min-instances=0
-        run: |
-          VERSION_TAG="${{ steps.tag_version.outputs.new_tag }}"
-          echo "🚀 Deploying version $VERSION_TAG to Cloud Run (Staging)..."
-          echo "🎯 Service: ${{ env.SERVICE_NAME }}"
-          
-          # 1. Define the complex variable in the shell without quotes
+          # 1: Define the complex CORS variable in the shell environment first
           CORS_ORIGINS_VAR="CORS_ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}"
           
-          # 2. Deploy using the local shell variable $CORS_ORIGINS_VAR
+          # Deploy the service
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$VERSION_TAG \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$DEPLOY_TAG \
             --region=${{ env.REGION }} \
             --project=${{ env.PROJECT_ID }} \
             --platform=managed \
@@ -231,7 +197,7 @@ jobs:
             --concurrency=80 \
             --max-instances=2 \
             --min-instances=0 \
-            --set-env-vars="ENVIRONMENT=production,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=${{ vars.JWT_ALGORITHM }},JWT_EXPIRY_DAYS=${{ vars.JWT_EXPIRY_DAYS }},REFRESH_TOKEN_EXPIRY_DAYS=${{ vars.REFRESH_TOKEN_EXPIRY_DAYS }},SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }}" \
+            --set-env-vars="ENVIRONMENT=staging,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=${{ vars.JWT_ALGORITHM }},JWT_EXPIRY_DAYS=${{ vars.JWT_EXPIRY_DAYS }},REFRESH_TOKEN_EXPIRY_DAYS=${{ vars.REFRESH_TOKEN_EXPIRY_DAYS }},SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }}" \
             --set-env-vars="$CORS_ORIGINS_VAR"
 
       # Step 9: Get service URL
@@ -246,7 +212,7 @@ jobs:
           echo "🎯 Service: ${{ env.SERVICE_NAME }}"
           echo "🌍 Environment: Staging"
           echo "📦 Branch: ${{ steps.branch_name.outputs.branch }}"
-          echo "📦 Version: ${{ github.sha }}"
+          echo "📦 Version: ${{ steps.branch_name.outputs.sanitized_branch }}"
 
       # Step 10: Run smoke test
       - name: Smoke test
