@@ -186,7 +186,7 @@ jobs:
             --project=${{ env.PROJECT_ID }} \
             --platform=managed \
             --allow-unauthenticated \
-            --set-env-vars="ENVIRONMENT=production,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=${{ vars.JWT_ALGORITHM }},JWT_EXPIRY_DAYS=${{ vars.JWT_EXPIRY_DAYS }},REFRESH_TOKEN_EXPIRY_DAYS=${{ vars.REFRESH_TOKEN_EXPIRY_DAYS }},SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=^:^${{ vars.ALLOWED_ORIGINS }}^:^" \
+            --set-env-vars="ENVIRONMENT=production,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=${{ vars.JWT_ALGORITHM }},JWT_EXPIRY_DAYS=${{ vars.JWT_EXPIRY_DAYS }},REFRESH_TOKEN_EXPIRY_DAYS=${{ vars.REFRESH_TOKEN_EXPIRY_DAYS }},SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}" \
             --memory=512Mi \
             --cpu=1 \
             --timeout=60s \
