@@ -181,11 +181,8 @@ jobs:
           echo "🎯 Service: ${{ env.SERVICE_NAME }}"
           echo "🌍 Environment: Production"
           
-          # Define the complex CORS variable in the shell environment first
-          # This prevents gcloud from misinterpreting the comma (,) in the URL list
-          CORS_ORIGINS_VAR="CORS_ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}"
-          
-          # Deploy the service, using --set-env-vars="$CORS_ORIGINS_VAR" for the complex value
+          # Deploy the service with custom delimiter for CORS_ALLOWED_ORIGINS
+          # Use ^@^ as delimiter since the value contains commas
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$VERSION_TAG \
             --region=${{ env.REGION }} \
@@ -198,8 +195,7 @@ jobs:
             --concurrency=80 \
             --max-instances=2 \
             --min-instances=0 \
-            --set-env-vars="ENVIRONMENT=production,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=${{ vars.JWT_ALGORITHM }},JWT_EXPIRY_DAYS=${{ vars.JWT_EXPIRY_DAYS }},REFRESH_TOKEN_EXPIRY_DAYS=${{ vars.REFRESH_TOKEN_EXPIRY_DAYS }},SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }}" \
-            --set-env-vars="$CORS_ORIGINS_VAR" # <--- This is the fix for the comma/quoting issue
+            --set-env-vars="^@^ENVIRONMENT=production@DATABASE_URL=${{ secrets.DATABASE_URL }}@JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}@JWT_ALGORITHM=${{ vars.JWT_ALGORITHM }}@JWT_EXPIRY_DAYS=${{ vars.JWT_EXPIRY_DAYS }}@REFRESH_TOKEN_EXPIRY_DAYS=${{ vars.REFRESH_TOKEN_EXPIRY_DAYS }}@SUPABASE_URL=${{ vars.SUPABASE_URL }}@SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }}@SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}@SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}@GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }}@GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }}@CORS_ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}^@^"
 
       # Step 10: Get service URL
       - name: Get service URL
