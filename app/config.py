@@ -20,15 +20,7 @@ class Settings(BaseSettings):
     # Backend JWT
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
-    jwt_expiry_days: int = 30  # Token expiration in days (30 days = 2592000 seconds)
-
-    # Cookie Configuration (for HTTP-only cookie authentication)
-    cookie_secure: bool = False  # Set to False in development (HTTP), True in production (HTTPS)
-    cookie_samesite: str = "Lax"  # CSRF protection: Lax, Strict, or None
-    cookie_domain: str | None = (
-        None  # None for dev, ".thesubtribe.com" for production (cross-subdomain)
-    )
-    cookie_max_age: int = 2592000  # 30 days in seconds (must match jwt_expiry_days)
+    jwt_expiry_days: int = 20
 
     # Google Cloud Storage
     gcs_bucket_name: str
@@ -38,7 +30,9 @@ class Settings(BaseSettings):
     )
 
     # App Config
-    cors_allowed_origins: str = r"^https?://(localhost(:\d+)?|192\.168\.\d{1,3}\.\d{1,3}(:\d+)?)$"
+    cors_allowed_origins: str = (
+        "http://localhost:3000,http://localhost:3001"  # Comma-separated list of allowed origins
+    )
     environment: str = "development"
     debug: bool = True
 

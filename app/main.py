@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -21,8 +22,6 @@ async def lifespan(app: FastAPI):
     # Use JSON format for any cloud deployment (cleaner, no color codes)
     # Use console format only for local development (colored output in terminal)
     # Detection: K_SERVICE (GCP Cloud Run) or AWS_EXECUTION_ENV (AWS Lambda/ECS)
-    import os
-
     is_cloud_deployment = os.getenv("K_SERVICE") or os.getenv("AWS_EXECUTION_ENV")
     log_format = "json" if is_cloud_deployment else settings.log_format
 
@@ -53,7 +52,7 @@ app = FastAPI(
     description="Multi-tenant Applicant Tracking System",
     version="1.0.0",
     debug=settings.debug,
-    lifespan=lifespan,  # Add lifespan event
+    lifespan=lifespan,  # Add lifespan event for logging initialization
     # Disable docs in production for security
     docs_url="/docs" if settings.environment != "production" else None,
     redoc_url="/redoc" if settings.environment != "production" else None,
@@ -92,21 +91,24 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 # Middleware (order matters: last added = first executed)
-# 1. CORS (must be first)
+# 1. Logging middleware (wraps all requests with correlation ID)
+app.add_middleware(
+    LoggingMiddleware,
+    log_mode=settings.log_mode,
+    sampling_rate=settings.log_sampling_rate,
+)
+
+# 2. CORS - Parse comma-separated origins from environment variable
+allowed_origins = [
+    origin.strip() for origin in settings.cors_allowed_origins.split(",") if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    max_age=3600,  # Cache preflight responses for 1 hour (reduces OPTIONS spam)
-)
-
-# 2. Logging middleware (executes for all requests)
-app.add_middleware(
-    LoggingMiddleware,
-    log_mode=settings.log_mode,
-    sampling_rate=settings.log_sampling_rate,
+    max_age=3600,  # Cache CORS preflight for 1 hour (reduces OPTIONS spam)
 )
 
 # Exception handlers
@@ -121,8 +123,8 @@ async def health_check():
 
 app.include_router(auth.router, prefix="/auth")
 app.include_router(companies.router, prefix="/companies")
+app.include_router(dashboard.router, prefix="/dashboard")
 app.include_router(jobs.router, prefix="/jobs")
 app.include_router(jobs.public_router, prefix="/public/jobs")
 app.include_router(applications.public_router, prefix="/public")
 app.include_router(applications.router, prefix="/applications")
-app.include_router(dashboard.router, prefix="/dashboard")
