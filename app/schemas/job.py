@@ -40,15 +40,52 @@ class JobCreate(BaseModel):
     salary_max: int | None = Field(None, ge=0, description="Maximum salary")
     salary_currency: str | None = Field("INR", max_length=10, description="Default: INR")
 
+    # Experience (optional)
+    min_experience_years: int | None = Field(None, ge=0, description="Minimum years of experience")
+    max_experience_years: int | None = Field(None, ge=0, description="Maximum years of experience")
+
+    # Skills (optional)
+    required_skills: list[str] = Field(default_factory=list, description="Required skills")
+    preferred_skills: list[str] = Field(default_factory=list, description="Nice-to-have skills")
+
+    # Screening Questions (optional)
+    screening_questions: list[dict] = Field(
+        default_factory=list, description="Custom screening questions for candidates"
+    )
+
     # Status (optional, defaults to draft)
     status: str | None = Field("draft", description="draft | active | closed")
+
+    @field_validator("title", "description")
+    @classmethod
+    def validate_required_text(cls, v: str, info) -> str:
+        """Validate required text fields."""
+        if not v or not v.strip():
+            field_name = info.field_name.title()
+            raise ValueError(f"{field_name} is required and cannot be empty")
+        v = v.strip()
+        if info.field_name == "title" and len(v) > 255:
+            raise ValueError("Job title must be 255 characters or less")
+        if info.field_name == "description" and len(v) > 100000:
+            raise ValueError("Job description is too long (maximum 100,000 characters)")
+        return v
 
     @field_validator("position_type")
     @classmethod
     def validate_position_type(cls, v):
-        if v and v not in ["full_time", "part_time", "contract", "internship"]:
+        valid_types = [
+            "full_time",
+            "part_time",
+            "contract",
+            "temporary",
+            "other",
+            "volunteer",
+            "internship",
+        ]
+        if v and v not in valid_types:
             raise ValueError(
-                "position_type must be one of: full_time, part_time, contract, internship"
+                "Position type must be one of: Full-time, Part-time, Contract, "
+                "Temporary, Other, Volunteer, or Internship"
             )
         return v
 
@@ -56,14 +93,37 @@ class JobCreate(BaseModel):
     @classmethod
     def validate_location_type(cls, v):
         if v and v not in ["remote", "hybrid", "onsite"]:
-            raise ValueError("location_type must be one of: remote, hybrid, onsite")
+            raise ValueError("Location type must be one of: Remote, Hybrid, or Onsite")
         return v
 
     @field_validator("status")
     @classmethod
     def validate_status(cls, v):
         if v not in ["draft", "active", "closed"]:
-            raise ValueError("status must be one of: draft, active, closed")
+            raise ValueError("Job status must be one of: Draft, Active, or Closed")
+        return v
+
+    @field_validator("salary_min", "salary_max")
+    @classmethod
+    def validate_salary(cls, v: int | None, info) -> int | None:
+        """Validate salary fields."""
+        if v is None:
+            return None
+        if v < 0:
+            field_name = "Minimum salary" if info.field_name == "salary_min" else "Maximum salary"
+            raise ValueError(f"{field_name} cannot be negative")
+        return v
+
+    @field_validator("min_experience_years", "max_experience_years")
+    @classmethod
+    def validate_experience(cls, v: int | None, info) -> int | None:
+        """Validate experience fields."""
+        if v is None:
+            return None
+        if v < 0:
+            raise ValueError("Years of experience cannot be negative")
+        if v > 50:
+            raise ValueError("Years of experience must be 50 or less")
         return v
 
 
@@ -86,14 +146,58 @@ class JobUpdate(BaseModel):
     salary_max: int | None = Field(None, ge=0)
     salary_currency: str | None = Field(None, max_length=10)
 
+    min_experience_years: int | None = Field(None, ge=0)
+    max_experience_years: int | None = Field(None, ge=0)
+
+    required_skills: list[str] | None = None
+    preferred_skills: list[str] | None = None
+
+    screening_questions: list[dict] | None = None
+
     status: str | None = None
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, v: str | None) -> str | None:
+        """Validate title."""
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            raise ValueError("Job title cannot be empty")
+        if len(v) > 255:
+            raise ValueError("Job title must be 255 characters or less")
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, v: str | None) -> str | None:
+        """Validate description."""
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            raise ValueError("Job description cannot be empty")
+        if len(v) > 100000:
+            raise ValueError("Job description is too long (maximum 100,000 characters)")
+        return v
 
     @field_validator("position_type")
     @classmethod
     def validate_position_type(cls, v):
-        if v and v not in ["full_time", "part_time", "contract", "internship"]:
+        valid_types = [
+            "full_time",
+            "part_time",
+            "contract",
+            "temporary",
+            "other",
+            "volunteer",
+            "internship",
+        ]
+        if v and v not in valid_types:
             raise ValueError(
-                "position_type must be one of: full_time, part_time, contract, internship"
+                "Position type must be one of: Full-time, Part-time, Contract, "
+                "Temporary, Other, Volunteer, or Internship"
             )
         return v
 
@@ -101,14 +205,37 @@ class JobUpdate(BaseModel):
     @classmethod
     def validate_location_type(cls, v):
         if v and v not in ["remote", "hybrid", "onsite"]:
-            raise ValueError("location_type must be one of: remote, hybrid, onsite")
+            raise ValueError("Location type must be one of: Remote, Hybrid, or Onsite")
         return v
 
     @field_validator("status")
     @classmethod
     def validate_status(cls, v):
         if v and v not in ["draft", "active", "closed"]:
-            raise ValueError("status must be one of: draft, active, closed")
+            raise ValueError("Job status must be one of: Draft, Active, or Closed")
+        return v
+
+    @field_validator("salary_min", "salary_max")
+    @classmethod
+    def validate_salary(cls, v: int | None, info) -> int | None:
+        """Validate salary fields."""
+        if v is None:
+            return None
+        if v < 0:
+            field_name = "Minimum salary" if info.field_name == "salary_min" else "Maximum salary"
+            raise ValueError(f"{field_name} cannot be negative")
+        return v
+
+    @field_validator("min_experience_years", "max_experience_years")
+    @classmethod
+    def validate_experience(cls, v: int | None, info) -> int | None:
+        """Validate experience fields."""
+        if v is None:
+            return None
+        if v < 0:
+            raise ValueError("Years of experience cannot be negative")
+        if v > 50:
+            raise ValueError("Years of experience must be 50 or less")
         return v
 
 
@@ -174,6 +301,14 @@ class JobResponse(BaseModel):
     salary_max: int | None = None
     salary_currency: str | None = None
 
+    min_experience_years: int | None = None
+    max_experience_years: int | None = None
+
+    required_skills: list[str] = Field(default_factory=list)
+    preferred_skills: list[str] = Field(default_factory=list)
+
+    screening_questions: list[dict] = Field(default_factory=list)
+
     status: str
     slug: str
     views_count: int
@@ -199,6 +334,7 @@ class JobListItem(BaseModel):
     position_type: str | None = None
     location_type: str | None = None
     views_count: int
+    applications_count: int
 
     created_by: UUID
     creator: JobCreatorResponse | None = None
@@ -237,6 +373,14 @@ class PublicJobResponse(BaseModel):
     salary_max: int | None = None
     salary_currency: str | None = None
 
+    min_experience_years: int | None = None
+    max_experience_years: int | None = None
+
+    required_skills: list[str] = Field(default_factory=list)
+    preferred_skills: list[str] = Field(default_factory=list)
+
+    screening_questions: list[dict] = Field(default_factory=list)
+
     status: str
     views_count: int
 
@@ -245,3 +389,86 @@ class PublicJobResponse(BaseModel):
 
     # Company details for candidates
     company: CompanyPublicResponse
+
+
+# ============================================================================
+# Job Statistics Schemas
+# ============================================================================
+
+
+class JobApplicationsByStatus(BaseModel):
+    """Applications grouped by status for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    applied: int
+    screening: int
+    interviewing: int
+    offer: int
+    hired: int
+    rejected: int
+
+
+class JobApplicationStats(BaseModel):
+    """Application statistics for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    total: int
+    today: int
+    this_week: int
+    this_month: int
+    by_status: JobApplicationsByStatus
+
+
+class JobViewStats(BaseModel):
+    """View statistics for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    total: int
+
+
+class JobQualityMetrics(BaseModel):
+    """Quality and conversion metrics for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    application_rate: float  # (applications / views) * 100
+    screening_rate: float  # (screening+ / total) * 100 - how many pass initial screen
+    interview_rate: float  # (interviewing+ / total) * 100
+    offer_rate: float  # (offer+ / total) * 100
+    hire_rate: float  # (hired / total) * 100
+
+
+class JobActivityStats(BaseModel):
+    """Activity metrics for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    latest_application_at: datetime | None = None
+    days_since_last_application: int | None = None
+    days_since_published: int | None = None
+    is_recently_active: bool  # True if application in last 7 days
+
+
+class JobPipelineStats(BaseModel):
+    """Pipeline conversion metrics for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    conversion_rate: float
+    avg_time_to_hire_days: float | None = None
+
+
+class JobStatsResponse(BaseModel):
+    """Statistics response for a specific job."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    applications: JobApplicationStats
+    views: JobViewStats
+    quality: JobQualityMetrics
+    activity: JobActivityStats
+    pipeline: JobPipelineStats | None = None
+    generated_at: datetime

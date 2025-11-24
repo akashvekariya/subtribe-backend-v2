@@ -20,7 +20,15 @@ class Settings(BaseSettings):
     # Backend JWT
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
-    jwt_expiry_days: int = 20
+    jwt_expiry_days: int = 30  # Token expiration in days (30 days = 2592000 seconds)
+
+    # Cookie Configuration (for HTTP-only cookie authentication)
+    cookie_secure: bool = False  # Set to False in development (HTTP), True in production (HTTPS)
+    cookie_samesite: str = "Lax"  # CSRF protection: Lax, Strict, or None
+    cookie_domain: str | None = (
+        None  # None for dev, ".thesubtribe.com" for production (cross-subdomain)
+    )
+    cookie_max_age: int = 2592000  # 30 days in seconds (must match jwt_expiry_days)
 
     # Google Cloud Storage
     gcs_bucket_name: str
@@ -30,11 +38,18 @@ class Settings(BaseSettings):
     )
 
     # App Config
-    cors_allowed_origins: str = (
-        "http://localhost:3000,http://localhost:3001"  # Comma-separated list of allowed origins
-    )
+    cors_allowed_origins: str = r"^https?://(localhost(:\d+)?|192\.168\.\d{1,3}\.\d{1,3}(:\d+)?)$"
     environment: str = "development"
     debug: bool = True
+
+    # Logging Configuration
+    log_mode: str = "smart"  # full, smart, or minimal
+    log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR (for app.* loggers)
+    log_format: str = "console"  # console or json (auto-set based on environment)
+    log_sampling_rate: float = 1.0  # 0.0-1.0 (fraction of requests to log)
+    log_request_body: bool = True  # Log request bodies (can override per route)
+    log_response_body: bool = True  # Log response bodies (can override per route)
+    third_party_log_level: str = "WARNING"  # Log level for ALL third-party libraries
 
     model_config = SettingsConfigDict(
         env_file=f".env.{os.getenv('ENVIRONMENT', 'development')}",

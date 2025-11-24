@@ -1,11 +1,11 @@
 """Job endpoints - CRUD operations for job postings."""
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -20,10 +20,18 @@ from app.schemas.application import (
 )
 from app.schemas.common import PaginationMeta
 from app.schemas.job import (
+    JobActivityStats,
+    JobApplicationsByStatus,
+    JobApplicationStats,
     JobCreate,
+    JobListItem,
     JobListResponse,
+    JobPipelineStats,
+    JobQualityMetrics,
     JobResponse,
+    JobStatsResponse,
     JobUpdate,
+    JobViewStats,
     PublicJobResponse,
 )
 
@@ -163,21 +171,43 @@ async def list_jobs(
     pages = (total + limit - 1) // limit  # Ceiling division
     offset = (page - 1) * limit
 
-    # Get paginated jobs (excluding soft-deleted)
+    # Get paginated jobs with applications_count (excluding soft-deleted)
     stmt = (
-        select(Job)
+        select(Job, func.count(Application.id).label("applications_count"))
+        .outerjoin(Application, (Application.job_id == Job.id) & (Application.deleted_at.is_(None)))
         .where(Job.company_id == current_user["company_id"], Job.deleted_at.is_(None))
         .options(selectinload(Job.creator))
+        .group_by(Job.id)
         .order_by(Job.created_at.desc())
         .offset(offset)
         .limit(limit)
     )
 
     result = await db.execute(stmt)
-    jobs = result.scalars().all()
+    jobs_with_counts = []
+    for row in result:
+        job = row[0]
+        app_count = row[1]
+
+        # Convert Job model to dict and add applications_count
+        job_dict = {
+            "id": job.id,
+            "title": job.title,
+            "slug": job.slug,
+            "status": job.status,
+            "position_type": job.position_type,
+            "location_type": job.location_type,
+            "views_count": job.views_count,
+            "applications_count": app_count,
+            "created_by": job.created_by,
+            "creator": job.creator,
+            "published_at": job.published_at,
+            "created_at": job.created_at,
+        }
+        jobs_with_counts.append(JobListItem(**job_dict))
 
     return JobListResponse(
-        data=jobs,
+        data=jobs_with_counts,
         pagination=PaginationMeta(
             page=page,
             limit=limit,
@@ -261,6 +291,183 @@ async def update_job(
     job_with_relations = result.scalar_one()
 
     return job_with_relations
+
+
+@router.get("/{job_id}/stats", response_model=JobStatsResponse, tags=["Jobs"])
+async def get_job_stats(
+    job_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get statistics for a specific job.
+
+    Returns comprehensive stats including:
+    - Application counts by status and time period
+    - View statistics
+    - Quality metrics (application rate, screening rate, etc.)
+    - Activity metrics (latest application, days since published, etc.)
+    - Pipeline conversion metrics
+
+    Args:
+        job_id: Job UUID
+        current_user: Authenticated user from JWT
+        db: Database session
+
+    Returns:
+        JobStatsResponse with all statistics for the job
+    """
+    # 1. Verify job exists and belongs to user's company
+    result = await db.execute(
+        select(Job).where(
+            Job.id == job_id,
+            Job.company_id == current_user["company_id"],
+            Job.deleted_at.is_(None),
+        )
+    )
+    job = result.scalar_one_or_none()
+
+    if not job:
+        raise NotFoundError(message="Job not found", code="job_not_found")
+
+    # 2. Get current timestamp for date calculations
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+
+    # 3. Efficient single query with conditional counts + latest application
+    query = select(
+        # Total applications
+        func.count(Application.id).label("total_applications"),
+        # Applications by time period
+        func.count(
+            case(
+                (Application.created_at >= today_start, Application.id),
+                else_=None,
+            )
+        ).label("today_applications"),
+        func.count(
+            case(
+                (Application.created_at >= week_ago, Application.id),
+                else_=None,
+            )
+        ).label("week_applications"),
+        func.count(
+            case(
+                (Application.created_at >= month_ago, Application.id),
+                else_=None,
+            )
+        ).label("month_applications"),
+        # Applications by status
+        func.count(case((Application.status == "applied", Application.id), else_=None)).label(
+            "applied_count"
+        ),
+        func.count(case((Application.status == "screening", Application.id), else_=None)).label(
+            "screening_count"
+        ),
+        func.count(case((Application.status == "interviewing", Application.id), else_=None)).label(
+            "interviewing_count"
+        ),
+        func.count(case((Application.status == "offer", Application.id), else_=None)).label(
+            "offer_count"
+        ),
+        func.count(case((Application.status == "hired", Application.id), else_=None)).label(
+            "hired_count"
+        ),
+        func.count(case((Application.status == "rejected", Application.id), else_=None)).label(
+            "rejected_count"
+        ),
+        # Latest application timestamp
+        func.max(Application.created_at).label("latest_application_at"),
+    ).where(
+        Application.job_id == job_id,
+        Application.deleted_at.is_(None),  # Exclude soft-deleted applications
+    )
+
+    result = await db.execute(query)
+    row = result.one()
+
+    # 4. Extract counts
+    total_apps = row.total_applications or 0
+    applied_count = row.applied_count or 0
+    screening_count = row.screening_count or 0
+    interviewing_count = row.interviewing_count or 0
+    offer_count = row.offer_count or 0
+    hired_count = row.hired_count or 0
+    rejected_count = row.rejected_count or 0
+
+    # 5. Calculate quality metrics
+    views_count = job.views_count or 0
+    application_rate = (total_apps / views_count * 100) if views_count > 0 else 0.0
+
+    # Screening+ means screening, interviewing, offer, or hired (passed initial screening)
+    screening_plus = screening_count + interviewing_count + offer_count + hired_count
+    screening_rate = (screening_plus / total_apps * 100) if total_apps > 0 else 0.0
+
+    # Interview+ means interviewing, offer, or hired
+    interview_plus = interviewing_count + offer_count + hired_count
+    interview_rate = (interview_plus / total_apps * 100) if total_apps > 0 else 0.0
+
+    # Offer+ means offer or hired
+    offer_plus = offer_count + hired_count
+    offer_rate = (offer_plus / total_apps * 100) if total_apps > 0 else 0.0
+
+    # Hire rate
+    hire_rate = (hired_count / total_apps * 100) if total_apps > 0 else 0.0
+
+    # 6. Calculate activity metrics
+    latest_application_at = row.latest_application_at
+    days_since_last_application = None
+    is_recently_active = False
+
+    if latest_application_at:
+        days_since_last_application = (now - latest_application_at).days
+        is_recently_active = days_since_last_application <= 7
+
+    days_since_published = None
+    if job.published_at:
+        days_since_published = (now - job.published_at).days
+
+    # 7. Calculate pipeline metrics
+    conversion_rate = hire_rate  # Same as hire_rate
+
+    # 8. Build response
+    return JobStatsResponse(
+        applications=JobApplicationStats(
+            total=total_apps,
+            today=row.today_applications or 0,
+            this_week=row.week_applications or 0,
+            this_month=row.month_applications or 0,
+            by_status=JobApplicationsByStatus(
+                applied=applied_count,
+                screening=screening_count,
+                interviewing=interviewing_count,
+                offer=offer_count,
+                hired=hired_count,
+                rejected=rejected_count,
+            ),
+        ),
+        views=JobViewStats(total=views_count),
+        quality=JobQualityMetrics(
+            application_rate=round(application_rate, 2),
+            screening_rate=round(screening_rate, 2),
+            interview_rate=round(interview_rate, 2),
+            offer_rate=round(offer_rate, 2),
+            hire_rate=round(hire_rate, 2),
+        ),
+        activity=JobActivityStats(
+            latest_application_at=latest_application_at,
+            days_since_last_application=days_since_last_application,
+            days_since_published=days_since_published,
+            is_recently_active=is_recently_active,
+        ),
+        pipeline=JobPipelineStats(
+            conversion_rate=round(conversion_rate, 2),
+            avg_time_to_hire_days=None,  # TODO: Implement in future iteration
+        ),
+        generated_at=now,
+    )
 
 
 # ============================================================================

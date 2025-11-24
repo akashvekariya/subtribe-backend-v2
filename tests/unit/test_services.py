@@ -13,9 +13,14 @@ from app.services.storage import StorageService
 class TestStorageService:
     """Test GCS storage service with mocks."""
 
+    @patch("app.services.storage.service_account.Credentials.from_service_account_file")
     @patch("app.services.storage.storage.Client")
-    def test_upload_resume_success(self, mock_storage_client):
+    def test_upload_resume_success(self, mock_storage_client, mock_credentials):
         """Test successful resume upload."""
+        # Mock credentials
+        mock_creds = MagicMock()
+        mock_credentials.return_value = mock_creds
+
         # Mock GCS client and bucket
         mock_bucket = MagicMock()
         mock_blob = MagicMock()
@@ -25,6 +30,7 @@ class TestStorageService:
         # Create storage service
         service = StorageService()
         service._client = mock_storage_client.return_value
+        service._signing_credentials = mock_creds
 
         # Create fake file
         file_content = b"PDF content here"
@@ -48,9 +54,14 @@ class TestStorageService:
         assert "company-123" in result
         assert "job-456" in result
 
+    @patch("app.services.storage.service_account.Credentials.from_service_account_file")
     @patch("app.services.storage.storage.Client")
-    def test_generate_signed_url_inline(self, mock_storage_client):
+    def test_generate_signed_url_inline(self, mock_storage_client, mock_credentials):
         """Test generating signed URL for viewing (inline)."""
+        # Mock credentials
+        mock_creds = MagicMock()
+        mock_credentials.return_value = mock_creds
+
         # Mock GCS client
         mock_bucket = MagicMock()
         mock_blob = MagicMock()
@@ -62,6 +73,7 @@ class TestStorageService:
         # Create storage service
         service = StorageService()
         service._client = mock_storage_client.return_value
+        service._signing_credentials = mock_creds
 
         # Generate signed URL (synchronous method)
         result = service.generate_signed_url(
@@ -77,9 +89,14 @@ class TestStorageService:
         call_kwargs = mock_blob.generate_signed_url.call_args[1]
         assert call_kwargs["response_disposition"].startswith("inline")
 
+    @patch("app.services.storage.service_account.Credentials.from_service_account_file")
     @patch("app.services.storage.storage.Client")
-    def test_generate_signed_url_attachment(self, mock_storage_client):
+    def test_generate_signed_url_attachment(self, mock_storage_client, mock_credentials):
         """Test generating signed URL for download (attachment)."""
+        # Mock credentials
+        mock_creds = MagicMock()
+        mock_credentials.return_value = mock_creds
+
         # Mock GCS client
         mock_bucket = MagicMock()
         mock_blob = MagicMock()
@@ -91,6 +108,7 @@ class TestStorageService:
         # Create storage service
         service = StorageService()
         service._client = mock_storage_client.return_value
+        service._signing_credentials = mock_creds
 
         # Generate signed URL (synchronous method)
         service.generate_signed_url(

@@ -1,11 +1,39 @@
 """FastAPI dependencies for auth, database, etc."""
 
+from contextvars import ContextVar
+
 from fastapi import Cookie, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import ExpiredSignatureError, JWTError, jwt
 
 from app.config import settings
 from app.exceptions import ForbiddenError, UnauthorizedError
+
+# Correlation ID context variable (thread-safe, async-safe)
+_correlation_id_ctx_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+
+
+def get_correlation_id() -> str | None:
+    """Get correlation ID for current request.
+
+    Returns None if no correlation ID is set (e.g., called outside request context).
+
+    Returns:
+        Correlation ID (UUID string) or None
+    """
+    return _correlation_id_ctx_var.get()
+
+
+def set_correlation_id(correlation_id: str) -> None:
+    """Set correlation ID for current request.
+
+    This is called by LoggingMiddleware. Should not be called manually.
+
+    Args:
+        correlation_id: Correlation ID (UUID string)
+    """
+    _correlation_id_ctx_var.set(correlation_id)
+
 
 # Security scheme for Swagger UI (optional to allow cookie fallback)
 security = HTTPBearer(auto_error=False)
