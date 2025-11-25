@@ -45,6 +45,7 @@ class Application(Base):
     linkedin_url: Mapped[str | None] = mapped_column(String(3000), nullable=True)
     github_url: Mapped[str | None] = mapped_column(String(3000), nullable=True)
     portfolio_url: Mapped[str | None] = mapped_column(String(3000), nullable=True)
+    cover_letter: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Salary Info
     current_ctc: Mapped[int | None] = mapped_column(Integer, nullable=True)

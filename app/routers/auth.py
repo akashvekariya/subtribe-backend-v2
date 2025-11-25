@@ -3,9 +3,9 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+import bcrypt
 from fastapi import APIRouter, Depends, Response, status
 from jose import jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,17 +25,21 @@ from app.schemas.auth import (
 )
 
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt."""
-    return pwd_context.hash(password)
+    password_bytes = password.encode("utf-8")
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    password_bytes = plain_password.encode("utf-8")
+    hashed_bytes = hashed_password.encode("utf-8")
+    return bcrypt.checkpw(password_bytes, hashed_bytes)
 
 
 def create_access_token(
@@ -119,14 +123,18 @@ async def register(response: Response, data: RegisterRequest, db: AsyncSession =
     )
 
     # Set httpOnly cookie (secure for browsers)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,  # Not accessible via JavaScript
-        secure=settings.environment == "production",  # HTTPS only in production
-        samesite="lax",  # CSRF protection
-        max_age=settings.jwt_expiry_days * 24 * 60 * 60,  # seconds
-    )
+    cookie_kwargs = {
+        "key": "access_token",
+        "value": access_token,
+        "httponly": True,  # Not accessible via JavaScript (XSS protection)
+        "secure": settings.cookie_secure,  # HTTPS only in production
+        "samesite": settings.cookie_samesite,  # CSRF protection
+        "max_age": settings.cookie_max_age,  # 30 days in seconds
+    }
+    # Only set domain if configured (production: .thesubtribe.com, dev: None)
+    if settings.cookie_domain:
+        cookie_kwargs["domain"] = settings.cookie_domain
+    response.set_cookie(**cookie_kwargs)
 
     # Build response (also return token in body for API clients)
     return AuthResponse(
@@ -192,14 +200,18 @@ async def login(response: Response, data: LoginRequest, db: AsyncSession = Depen
     )
 
     # Set httpOnly cookie (secure for browsers)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,  # Not accessible via JavaScript
-        secure=settings.environment == "production",  # HTTPS only in production
-        samesite="lax",  # CSRF protection
-        max_age=settings.jwt_expiry_days * 24 * 60 * 60,  # seconds
-    )
+    cookie_kwargs = {
+        "key": "access_token",
+        "value": access_token,
+        "httponly": True,  # Not accessible via JavaScript (XSS protection)
+        "secure": settings.cookie_secure,  # HTTPS only in production
+        "samesite": settings.cookie_samesite,  # CSRF protection
+        "max_age": settings.cookie_max_age,  # 30 days in seconds
+    }
+    # Only set domain if configured (production: .thesubtribe.com, dev: None)
+    if settings.cookie_domain:
+        cookie_kwargs["domain"] = settings.cookie_domain
+    response.set_cookie(**cookie_kwargs)
 
     # Build response (also return token in body for API clients)
     return AuthResponse(
@@ -225,7 +237,12 @@ async def logout(response: Response):
 
     Note: For API clients using Authorization header, simply discard the token on client side.
     """
-    response.delete_cookie(key="access_token")
+    # Delete cookie with same parameters used when setting it
+    delete_kwargs = {"key": "access_token"}
+    # Must specify domain if it was set during cookie creation (production: .thesubtribe.com)
+    if settings.cookie_domain:
+        delete_kwargs["domain"] = settings.cookie_domain
+    response.delete_cookie(**delete_kwargs)
     return {"message": "Successfully logged out"}
 
 

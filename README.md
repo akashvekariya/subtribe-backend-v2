@@ -173,7 +173,7 @@ GCS_PROJECT_ID=...
 GOOGLE_APPLICATION_CREDENTIALS=path/to/key.json
 
 # App Config
-CORS_ORIGINS=["http://localhost:3000"]
+CORS_ALLOWED_ORIGINS=^https?://(localhost(:\d+)?|192\.168\.\d{1,3}\.\d{1,3}(:\d+)?)$
 ENVIRONMENT=development
 ```
 

@@ -56,4 +56,8 @@ class ApplicationStatusHistory(Base):
     changed_by_user: Mapped[User | None] = relationship("User", foreign_keys=[changed_by])
 
     def __repr__(self) -> str:
-        return f"<ApplicationStatusHistory(id={self.id}, {self.from_status} -> {self.to_status}, changed_by={self.changed_by}, notes={self.notes})>"
+        return (
+            f"<ApplicationStatusHistory(id={self.id}, "
+            f"{self.from_status} -> {self.to_status}, "
+            f"changed_by={self.changed_by}, notes={self.notes})>"
+        )

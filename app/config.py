@@ -36,6 +36,15 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
 
+    # Logging Configuration
+    log_mode: str = "smart"  # full, smart, or minimal
+    log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR (for app.* loggers)
+    log_format: str = "console"  # console or json (auto-set based on environment)
+    log_sampling_rate: float = 1.0  # 0.0-1.0 (fraction of requests to log)
+    log_request_body: bool = True  # Log request bodies (can override per route)
+    log_response_body: bool = True  # Log response bodies (can override per route)
+    third_party_log_level: str = "WARNING"  # Log level for ALL third-party libraries
+
     model_config = SettingsConfigDict(
         env_file=f".env.{os.getenv('ENVIRONMENT', 'development')}",
         env_file_encoding="utf-8",

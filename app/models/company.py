@@ -87,4 +87,7 @@ class Company(Base):
     __table_args__ = (CheckConstraint("slug ~ '^[a-z0-9-]+$'", name="slug_format"),)
 
     def __repr__(self) -> str:
-        return f"<Company(id={self.id}, name={self.name}, slug={self.slug}, website_url={self.website_url})>"
+        return (
+            f"<Company(id={self.id}, name={self.name}, "
+            f"slug={self.slug}, website_url={self.website_url})>"
+        )
