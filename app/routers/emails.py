@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user, require_role
+from app.dependencies import get_current_user
 from app.email.email_service import EmailService
 from app.email.template_renderer import TemplateRenderer
 from app.models.application import Application
@@ -46,36 +45,36 @@ class SendScheduledEmailResponse(BaseResponse):
     """Response for send scheduled email."""
 
     success: bool = Field(..., description="Whether email was sent successfully")
-    message_id: Optional[str] = Field(None, description="Provider message ID if sent")
+    message_id: str | None = Field(None, description="Provider message ID if sent")
 
 
 class SendEmailRequest(BaseModel):
     """Request to send an email to an application."""
 
-    template_id: Optional[UUID] = Field(None, description="Template ID to use (optional)")
+    template_id: UUID | None = Field(None, description="Template ID to use (optional)")
     subject: str = Field(..., min_length=1, max_length=1000, description="Email subject")
     body: str = Field(..., min_length=1, max_length=50000, description="Email body")
     send_immediately: bool = Field(True, description="Send now or schedule for later")
-    scheduled_for: Optional[datetime] = Field(None, description="When to send (if not immediately)")
+    scheduled_for: datetime | None = Field(None, description="When to send (if not immediately)")
 
 
 class SendEmailResponse(BaseResponse):
     """Response for sending email."""
 
-    email_id: Optional[UUID] = Field(None, description="ID of scheduled/sent email")
-    message_id: Optional[str] = Field(None, description="Provider message ID if sent immediately")
-    scheduled_for: Optional[datetime] = Field(None, description="When email will be sent")
+    email_id: UUID | None = Field(None, description="ID of scheduled/sent email")
+    message_id: str | None = Field(None, description="Provider message ID if sent immediately")
+    scheduled_for: datetime | None = Field(None, description="When email will be sent")
 
 
 class BulkEmailRequest(BaseModel):
     """Request to send bulk emails."""
 
     application_ids: list[UUID] = Field(..., min_length=1, description="List of application IDs")
-    template_id: Optional[UUID] = Field(None, description="Template ID to use (optional)")
+    template_id: UUID | None = Field(None, description="Template ID to use (optional)")
     subject: str = Field(..., min_length=1, max_length=1000, description="Email subject template")
     body: str = Field(..., min_length=1, max_length=50000, description="Email body template")
     send_immediately: bool = Field(True, description="Send now or schedule for later")
-    scheduled_for: Optional[datetime] = Field(None, description="When to send (if not immediately)")
+    scheduled_for: datetime | None = Field(None, description="When to send (if not immediately)")
 
 
 class BulkEmailResponse(BaseResponse):
@@ -90,7 +89,7 @@ class BulkEmailResponse(BaseResponse):
 class PreviewEmailRequest(BaseModel):
     """Request to preview an email."""
 
-    template_id: Optional[UUID] = Field(None, description="Template ID to use")
+    template_id: UUID | None = Field(None, description="Template ID to use")
     subject: str = Field(..., description="Email subject")
     body: str = Field(..., description="Email body")
 
@@ -134,10 +133,10 @@ class CreateEmailTemplateRequest(BaseModel):
 class UpdateEmailTemplateRequest(BaseModel):
     """Request to update email template."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    category: Optional[str] = Field(None)
-    subject: Optional[str] = Field(None, min_length=1, max_length=1000)
-    body: Optional[str] = Field(None, min_length=1, max_length=50000)
+    name: str | None = Field(None, min_length=1, max_length=100)
+    category: str | None = Field(None)
+    subject: str | None = Field(None, min_length=1, max_length=1000)
+    body: str | None = Field(None, min_length=1, max_length=50000)
 
 
 class EmailTemplateListResponse(BaseResponse):
@@ -200,7 +199,7 @@ async def send_scheduled_email_internal(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send email: {str(e)}",
-        )
+        ) from e
 
 
 # ========== Email Sending Endpoints ==========
@@ -251,7 +250,9 @@ async def send_email_to_application(
         "company_name": "our team",
     }
 
-    rendered_subject = template_renderer.render_with_fallbacks(request.subject, variables, fallbacks)
+    rendered_subject = template_renderer.render_with_fallbacks(
+        request.subject, variables, fallbacks
+    )
     rendered_body = template_renderer.render_with_fallbacks(request.body, variables, fallbacks)
 
     email_service = EmailService(db)
@@ -286,7 +287,9 @@ async def send_email_to_application(
     else:
         # Schedule for later
         if not request.scheduled_for:
-            raise HTTPException(status_code=400, detail="scheduled_for is required when not sending immediately")
+            raise HTTPException(
+                status_code=400, detail="scheduled_for is required when not sending immediately"
+            )
 
         scheduled_email = ScheduledEmail(
             company_id=current_user["company_id"],
@@ -343,7 +346,9 @@ async def send_bulk_emails(
 
     template_renderer = TemplateRenderer()
     email_service = EmailService(db)
-    scheduled_for = request.scheduled_for if not request.send_immediately else datetime.now(timezone.utc)
+    scheduled_for = (
+        request.scheduled_for if not request.send_immediately else datetime.now(timezone.utc)
+    )
 
     successful = 0
     failed = 0
@@ -366,8 +371,12 @@ async def send_bulk_emails(
                 "company_name": "our team",
             }
 
-            rendered_subject = template_renderer.render_with_fallbacks(request.subject, variables, fallbacks)
-            rendered_body = template_renderer.render_with_fallbacks(request.body, variables, fallbacks)
+            rendered_subject = template_renderer.render_with_fallbacks(
+                request.subject, variables, fallbacks
+            )
+            rendered_body = template_renderer.render_with_fallbacks(
+                request.body, variables, fallbacks
+            )
 
             scheduled_email = ScheduledEmail(
                 company_id=current_user["company_id"],
@@ -454,7 +463,9 @@ async def preview_email(
         "company_name": "our team",
     }
 
-    rendered_subject = template_renderer.render_with_fallbacks(request.subject, variables, fallbacks)
+    rendered_subject = template_renderer.render_with_fallbacks(
+        request.subject, variables, fallbacks
+    )
     rendered_body = template_renderer.render_with_fallbacks(request.body, variables, fallbacks)
 
     return PreviewEmailResponse(
@@ -498,7 +509,11 @@ async def list_email_templates(
     """List all email templates for the company."""
     company_id = current_user["company_id"]
 
-    stmt = select(EmailTemplate).where(EmailTemplate.company_id == company_id).order_by(EmailTemplate.name)
+    stmt = (
+        select(EmailTemplate)
+        .where(EmailTemplate.company_id == company_id)
+        .order_by(EmailTemplate.name)
+    )
     result = await db.execute(stmt)
     templates = result.scalars().all()
 
@@ -548,8 +563,9 @@ async def create_email_template(
 
     # Extract wildcards from body
     import re
-    wildcards_in_body = re.findall(r'\{(\w+)\}', request.body)
-    wildcards_in_subject = re.findall(r'\{(\w+)\}', request.subject)
+
+    wildcards_in_body = re.findall(r"\{(\w+)\}", request.body)
+    wildcards_in_subject = re.findall(r"\{(\w+)\}", request.subject)
     all_wildcards = list(set(wildcards_in_body + wildcards_in_subject))
 
     template = EmailTemplate(
@@ -664,8 +680,9 @@ async def update_email_template(
 
     # Re-extract wildcards
     import re
-    wildcards_in_body = re.findall(r'\{(\w+)\}', template.body)
-    wildcards_in_subject = re.findall(r'\{(\w+)\}', template.subject)
+
+    wildcards_in_body = re.findall(r"\{(\w+)\}", template.body)
+    wildcards_in_subject = re.findall(r"\{(\w+)\}", template.subject)
     template.wildcards = list(set(wildcards_in_body + wildcards_in_subject))
 
     await db.commit()

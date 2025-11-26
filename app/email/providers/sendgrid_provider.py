@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from app.email.providers.base import EmailMessage, EmailProvider, EmailResult
 
@@ -109,10 +108,7 @@ class SendGridEmailProvider(EmailProvider):
             else:
                 # Unexpected status code
                 error_msg = f"SendGrid returned status {response.status_code}"
-                logger.error(
-                    f"❌ [SENDGRID ERROR] {error_msg} | "
-                    f"Response: {response.body}"
-                )
+                logger.error(f"❌ [SENDGRID ERROR] {error_msg} | Response: {response.body}")
 
                 return EmailResult(
                     success=False,

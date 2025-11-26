@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional
 from uuid import UUID
 
 import pytz
@@ -61,8 +60,7 @@ class EmailService:
             return StubEmailProvider()
         elif settings.email_provider == "sendgrid":
             logger.info(
-                f"📧 Using SendGridEmailProvider "
-                f"(sandbox_mode={settings.sendgrid_sandbox_mode})"
+                f"📧 Using SendGridEmailProvider (sandbox_mode={settings.sendgrid_sandbox_mode})"
             )
             return SendGridEmailProvider(
                 api_key=settings.sendgrid_api_key,
@@ -79,7 +77,7 @@ class EmailService:
         self,
         application: Application,
         template_type: str,
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
     ) -> ScheduledEmail:
         """Schedule an email to be sent at 5 PM IST the next day.
 
@@ -221,9 +219,7 @@ class EmailService:
             )
             return False
 
-    async def _cancel_previous_emails(
-        self, application_id: UUID, template_type: str
-    ) -> int:
+    async def _cancel_previous_emails(self, application_id: UUID, template_type: str) -> int:
         """Cancel any pending emails for this application and template type.
 
         Args:
@@ -257,9 +253,7 @@ class EmailService:
 
         return count
 
-    async def _get_template(
-        self, company_id: UUID, template_type: str
-    ) -> Dict[str, str]:
+    async def _get_template(self, company_id: UUID, template_type: str) -> dict[str, str]:
         """Get email template (custom or default).
 
         Args:
@@ -301,9 +295,9 @@ class EmailService:
         now_ist = datetime.now(ist)
 
         # Calculate next day 5 PM IST
-        send_time_ist = now_ist.replace(
-            hour=17, minute=0, second=0, microsecond=0
-        ) + timedelta(days=1)
+        send_time_ist = now_ist.replace(hour=17, minute=0, second=0, microsecond=0) + timedelta(
+            days=1
+        )
 
         # Parse configured send time (default: "17:00")
         try:
@@ -311,8 +305,7 @@ class EmailService:
             send_time_ist = send_time_ist.replace(hour=int(hour), minute=int(minute))
         except (ValueError, AttributeError):
             logger.warning(
-                f"Invalid email_send_time_ist: {settings.email_send_time_ist}, "
-                f"using default 17:00"
+                f"Invalid email_send_time_ist: {settings.email_send_time_ist}, using default 17:00"
             )
 
         # Convert to UTC

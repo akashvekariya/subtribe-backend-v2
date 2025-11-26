@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from app.config import settings
@@ -54,7 +53,7 @@ class CloudTasksScheduler:
         scheduled_email_id: UUID,
         scheduled_for: datetime,
         target_url: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Create a Cloud Task to send an email at the scheduled time.
 
         Args:
@@ -67,8 +66,7 @@ class CloudTasksScheduler:
         """
         if not self.client or not self.queue_path:
             logger.warning(
-                "⚠️  Cloud Tasks client not initialized. "
-                "Email will need to be sent manually."
+                "⚠️  Cloud Tasks client not initialized. Email will need to be sent manually."
             )
             return None
 
@@ -99,9 +97,7 @@ class CloudTasksScheduler:
             )
 
             # Create the task
-            response = self.client.create_task(
-                request={"parent": self.queue_path, "task": task}
-            )
+            response = self.client.create_task(request={"parent": self.queue_path, "task": task})
 
             task_name = response.name
             logger.info(
@@ -113,9 +109,7 @@ class CloudTasksScheduler:
             return task_name
 
         except Exception as e:
-            logger.error(
-                f"❌ Failed to create Cloud Task for email {scheduled_email_id}: {str(e)}"
-            )
+            logger.error(f"❌ Failed to create Cloud Task for email {scheduled_email_id}: {str(e)}")
             return None
 
     def delete_task(self, task_name: str) -> bool:

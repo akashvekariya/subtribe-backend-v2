@@ -81,7 +81,9 @@ class ScheduledEmail(Base):
     )
 
     # Relationships
-    application: Mapped[Application] = relationship("Application", back_populates="scheduled_emails")
+    application: Mapped[Application] = relationship(
+        "Application", back_populates="scheduled_emails"
+    )
     company: Mapped[Company] = relationship("Company", back_populates="scheduled_emails")
 
     # Constraints & Indexes

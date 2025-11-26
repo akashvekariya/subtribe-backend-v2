@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiry_days: int = 20
 
+    # Cookie Configuration
+    cookie_secure: bool = False  # False for dev (HTTP), True for prod (HTTPS)
+    cookie_samesite: str = "Lax"  # CSRF protection
+    cookie_domain: str = ""  # Empty for dev, .thesubtribe.com for prod
+    cookie_max_age: int = 2592000  # 30 days in seconds
+
     # Google Cloud Storage
     gcs_bucket_name: str
     gcs_project_id: str

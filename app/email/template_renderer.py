@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ class TemplateRenderer:
     def render(
         self,
         template: str,
-        variables: Dict[str, Optional[str]],
+        variables: dict[str, str | None],
         fallback_strategy: str = "remove",
     ) -> str:
         """Render template by substituting variables.
@@ -84,8 +83,8 @@ class TemplateRenderer:
     def render_with_fallbacks(
         self,
         template: str,
-        variables: Dict[str, Optional[str]],
-        fallbacks: Dict[str, str],
+        variables: dict[str, str | None],
+        fallbacks: dict[str, str],
     ) -> str:
         """Render template with fallback values for missing variables.
 

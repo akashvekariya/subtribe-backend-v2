@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Optional
 
 
 @dataclass
@@ -12,7 +11,7 @@ class EmailMessage:
     """Email message data structure."""
 
     to_email: str
-    to_name: Optional[str]
+    to_name: str | None
     subject: str
     body: str  # Plain text body
     from_email: str
@@ -24,9 +23,9 @@ class EmailResult:
     """Result of email send operation."""
 
     success: bool
-    message_id: Optional[str] = None
-    error_message: Optional[str] = None
-    provider_response: Optional[Dict] = None
+    message_id: str | None = None
+    error_message: str | None = None
+    provider_response: dict | None = None
 
 
 class EmailProvider(ABC):

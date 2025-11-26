@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Dict
-
 # Default templates use {variable_name} syntax for substitution
 # Available variables:
 # - candidate_name: Candidate's first name (or "there" as fallback)
 # - company_name: Company name
 # - job_title: Job position title
 
-DEFAULT_TEMPLATES: Dict[str, Dict[str, str]] = {
+DEFAULT_TEMPLATES: dict[str, dict[str, str]] = {
     "interview_invite": {
         "subject": "Interview Invitation - {job_title} at {company_name}",
         "body": """Hey {candidate_name},
@@ -50,7 +48,7 @@ This is an automated message from Subtribe ATS. Please do not reply directly to 
 }
 
 
-def get_default_template(template_type: str) -> Dict[str, str]:
+def get_default_template(template_type: str) -> dict[str, str]:
     """Get default template for the given type.
 
     Args:
@@ -82,15 +80,13 @@ def get_required_variables(template_type: str) -> list[str]:
     """
     base_vars = ["candidate_name", "company_name", "job_title"]
 
-    if template_type == "interview_invite":
-        return base_vars
-    elif template_type == "rejection":
+    if template_type == "interview_invite" or template_type == "rejection":
         return base_vars
     else:
         raise ValueError(f"Invalid template_type: {template_type}")
 
 
-def get_variable_fallbacks() -> Dict[str, str]:
+def get_variable_fallbacks() -> dict[str, str]:
     """Get fallback values for template variables.
 
     Returns:

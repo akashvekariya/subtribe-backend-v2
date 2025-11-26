@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, String, Text, UniqueConstraint, text
+from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,7 +34,9 @@ class EmailTemplate(Base):
 
     # Template Identification
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    template_type: Mapped[str] = mapped_column(String(50), nullable=False)  # For backwards compatibility
+    template_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # For backwards compatibility
     category: Mapped[str] = mapped_column(String(50), nullable=False, server_default="custom")
 
     # Template Content
@@ -50,7 +52,9 @@ class EmailTemplate(Base):
     )
 
     # System Template Flag
-    is_default: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False, nullable=False)
+    is_default: Mapped[bool] = mapped_column(
+        Boolean, server_default="false", default=False, nullable=False
+    )
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -71,9 +75,7 @@ class EmailTemplate(Base):
     company: Mapped[Company] = relationship("Company", back_populates="email_templates")
 
     # Constraints
-    __table_args__ = (
-        UniqueConstraint("company_id", "name", name="uq_company_template_name"),
-    )
+    __table_args__ = (UniqueConstraint("company_id", "name", name="uq_company_template_name"),)
 
     def __repr__(self) -> str:
         return f"<EmailTemplate(company_id={self.company_id}, type={self.template_type})>"
