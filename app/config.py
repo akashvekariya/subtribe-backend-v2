@@ -47,7 +47,8 @@ class Settings(BaseSettings):
     email_send_time_ist: str = "17:00"  # 5 PM IST
 
     # Backend URL (for Cloud Tasks callbacks)
-    backend_url: str = "http://localhost:8000"  # Set to Cloud Run URL in production
+    # Auto-detected from K_SERVICE env var in Cloud Run, or set manually
+    backend_url: str = ""  # Empty = auto-detect in Cloud Run
 
     # App Config
     cors_allowed_origins: str = (

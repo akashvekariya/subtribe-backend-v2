@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -23,6 +24,25 @@ from app.models.scheduled_email import ScheduledEmail
 from app.schemas.common import BaseResponse
 
 logger = logging.getLogger(__name__)
+
+
+def get_backend_url() -> str | None:
+    """Get the backend URL for Cloud Tasks callbacks.
+
+    Returns the BACKEND_URL if set, otherwise None.
+    Cloud Run URLs are stable (don't change), so this only needs to be set once.
+    """
+    if settings.backend_url:
+        return settings.backend_url
+
+    # In Cloud Run without BACKEND_URL set, log warning
+    if os.environ.get("K_SERVICE"):
+        logger.warning(
+            "⚠️  BACKEND_URL not set. Cloud Tasks scheduling will be disabled. "
+            "Set BACKEND_URL to your Cloud Run service URL."
+        )
+    return None
+
 
 # Internal router (for Cloud Tasks)
 internal_router = APIRouter(tags=["Internal - Emails"])
@@ -334,12 +354,15 @@ async def send_email_to_application(
         await db.refresh(scheduled_email)
 
         # Create Cloud Task to send the email at the scheduled time
-        target_url = f"{settings.backend_url}/internal/emails/send"
-        task_name = cloud_tasks_scheduler.create_email_task(
-            scheduled_email_id=scheduled_email.id,
-            scheduled_for=request.scheduled_for,
-            target_url=target_url,
-        )
+        backend_url = get_backend_url()
+        task_name = None
+        if backend_url:
+            target_url = f"{backend_url}/internal/emails/send"
+            task_name = cloud_tasks_scheduler.create_email_task(
+                scheduled_email_id=scheduled_email.id,
+                scheduled_for=request.scheduled_for,
+                target_url=target_url,
+            )
 
         if task_name:
             scheduled_email.cloud_task_name = task_name
@@ -429,14 +452,16 @@ async def send_bulk_emails(
                     failed += 1
             else:
                 # Create Cloud Task for scheduled bulk email
-                target_url = f"{settings.backend_url}/internal/emails/send"
-                task_name = cloud_tasks_scheduler.create_email_task(
-                    scheduled_email_id=scheduled_email.id,
-                    scheduled_for=scheduled_for,
-                    target_url=target_url,
-                )
-                if task_name:
-                    scheduled_email.cloud_task_name = task_name
+                backend_url = get_backend_url()
+                if backend_url:
+                    target_url = f"{backend_url}/internal/emails/send"
+                    task_name = cloud_tasks_scheduler.create_email_task(
+                        scheduled_email_id=scheduled_email.id,
+                        scheduled_for=scheduled_for,
+                        target_url=target_url,
+                    )
+                    if task_name:
+                        scheduled_email.cloud_task_name = task_name
                 successful += 1
 
         except Exception as e:
