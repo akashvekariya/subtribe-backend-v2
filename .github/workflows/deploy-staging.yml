@@ -1,30 +1,31 @@
-name: CI/CD Pipeline
+name: Deploy to Staging
 
-# Trigger on all pull requests and pushes to any branch
-# Deployment is controlled by job-level conditions (only main deploys)
+# Automatic deployment to Staging on merges to staging branch
 on:
-  push:  # All pushes trigger lint-test, only main deploys
-  workflow_dispatch:  # Allow manual triggering
+  push:
+    branches:
+      - staging
+  workflow_dispatch: # Allow manual triggering if needed
 
-# Required for auto-versioning (create tags and releases)
+# Required for pushing images
 permissions:
-  contents: write
+  contents: read
 
 env:
   # GCP Configuration
   PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-  REGION: asia-south1  # Mumbai region
-  SERVICE_NAME: subtribe-ats-api-dev
-  IMAGE_NAME: subtribe-ats-backend
+  REGION: asia-south1 # Mumbai region
+  SERVICE_NAME: subtribe-backend-staging
+  ARTIFACT_REGISTRY_REPO: subtribe # Shared repo for all services
 
 jobs:
   # ============================================================================
-  # Job 1: Lint & Test (runs on all pushes/PRs)
+  # Job 1: Lint & Test (runs before Staging deployment)
   # ============================================================================
   lint-test:
     name: Lint & Test
     runs-on: ubuntu-latest
-    
+
     steps:
       # Step 1: Checkout code
       - name: Checkout code
@@ -99,116 +100,127 @@ jobs:
           echo "   - Code formatting ✓"
           echo "   - Type checking ✓"
           echo "   - Unit tests (schemas & services) ✓"
-          echo ""
-          echo "Note: Database-dependent tests (test_models.py) run locally only."
 
   # ============================================================================
-  # Job 2: Deploy (runs ONLY on push to main, after lint-test succeeds)
+  # Job 2: Deploy to Staging (on merge to staging, after lint-test succeeds)
   # ============================================================================
-  deploy:
-    name: Build & Deploy to Cloud Run
+  deploy-staging:
+    name: Build & Deploy to Cloud Run (Staging)
     runs-on: ubuntu-latest
-    needs: lint-test  # Wait for lint-test to pass
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'  # Deploy on push to main OR manual trigger
-    
+    needs: lint-test # Wait for lint-test to pass
+    environment: Staging
+
     steps:
       # Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history for versioning
 
-      # Step 2: Bump version and create tag
-      - name: Bump version and push tag
-        id: tag_version
-        uses: mathieudutour/github-tag-action@v6.2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: patch  # Default to patch if no conventional commit
-          release_branches: main
-          tag_prefix: v
-
-      # Step 3: Create GitHub Release
-      - name: Create GitHub Release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: ${{ steps.tag_version.outputs.new_tag }}
-          name: Release ${{ steps.tag_version.outputs.new_tag }}
-          body: ${{ steps.tag_version.outputs.changelog }}
-
-      # Step 4: Authenticate with Google Cloud
+      # Step 2: Authenticate with Google Cloud
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # Step 5: Set up Cloud SDK
+      # Step 3: Set up Cloud SDK
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      # Step 6: Configure Docker to use gcloud as credential helper
+      # Step 4: Configure Docker to use gcloud as credential helper
       - name: Configure Docker
         run: |
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      # Step 7: Build Docker image with version tags
+      # Step 5: Build Docker image with Staging build args
       - name: Build Docker image
         run: |
-          echo "🔨 Building Docker image version ${{ steps.tag_version.outputs.new_tag }}..."
+          echo "🔨 Building Docker image for Staging..."
+          echo "📦 Commit SHA: ${{ github.sha }}"
           docker build \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.tag_version.outputs.new_tag }} \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:latest \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest \
             .
 
-      # Step 8: Push Docker image to Artifact Registry
+      # Step 6: Push Docker image to Artifact Registry
       - name: Push Docker image
         run: |
-          echo "📦 Pushing Docker image with version ${{ steps.tag_version.outputs.new_tag }} to Artifact Registry..."
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.tag_version.outputs.new_tag }}
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:latest
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          echo "📦 Pushing Docker image to Artifact Registry..."
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest
 
-      # Step 9: Deploy to Cloud Run
-      - name: Deploy to Cloud Run
+      # Step 7: Deploy to Cloud Run (Staging)
+      - name: Deploy to Cloud Run (Staging)
         run: |
-          echo "🚀 Deploying version ${{ steps.tag_version.outputs.new_tag }} to Cloud Run..."
+          COMMIT_SHA="${{ github.sha }}"
+          echo "🚀 Deploying version $COMMIT_SHA to Cloud Run (Staging)..."
+          echo "🎯 Service: ${{ env.SERVICE_NAME }}"
+          echo "🌍 Environment: Staging"
+          
+          # 1. Create environment variables file (YAML format)
+          # This completely avoids shell quoting and comma delimiter issues.
+          cat > env-vars.yaml << EOF
+          ENVIRONMENT: "staging"
+          DATABASE_URL: "${{ secrets.DATABASE_URL }}"
+          JWT_SECRET_KEY: "${{ secrets.JWT_SECRET_KEY }}"
+          JWT_ALGORITHM: "${{ vars.JWT_ALGORITHM }}"
+          JWT_EXPIRY_DAYS: "${{ vars.JWT_EXPIRY_DAYS }}"
+          REFRESH_TOKEN_EXPIRY_DAYS: "${{ vars.REFRESH_TOKEN_EXPIRY_DAYS }}"
+          SUPABASE_URL: "${{ vars.SUPABASE_URL }}"
+          SUPABASE_ANON_KEY: "${{ vars.SUPABASE_ANON_KEY }}"
+          SUPABASE_SERVICE_KEY: "${{ secrets.SUPABASE_SERVICE_KEY }}"
+          SUPABASE_JWT_SECRET: "${{ secrets.SUPABASE_JWT_SECRET }}"
+          GCS_BUCKET_NAME: "${{ vars.GCS_BUCKET_NAME }}"
+          GCS_PROJECT_ID: "${{ vars.GCS_PROJECT_ID }}"
+          # The complex CORS value is passed here as a string value in YAML.
+          CORS_ALLOWED_ORIGINS: "${{ vars.ALLOWED_ORIGINS }}"
+          EOF
+          
+          # 2. Deploy using the environment variables file
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.tag_version.outputs.new_tag }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$COMMIT_SHA \
             --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
             --platform=managed \
             --allow-unauthenticated \
-            --set-env-vars="ENVIRONMENT=development,DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }},JWT_ALGORITHM=HS256,JWT_EXPIRY_DAYS=15,REFRESH_TOKEN_EXPIRY_DAYS=30,SUPABASE_URL=${{ vars.SUPABASE_URL }},SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }},GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }},GCS_PROJECT_ID=${{ vars.GCS_PROJECT_ID }},CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }}" \
-            --service-account=github-actions@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
+            --env-vars-file=env-vars.yaml \
             --memory=512Mi \
             --cpu=1 \
             --timeout=60s \
+            --concurrency=80 \
             --max-instances=2 \
             --min-instances=0
 
-      # Step 10: Get service URL
+          echo "🔀 Routing 100% traffic to latest revision..."
+          gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+            --to-latest \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }}
+
+      # Step 8: Get service URL
       - name: Get service URL
         run: |
           SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
             --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
             --format='value(status.url)')
           echo "✅ Deployment successful!"
           echo "🌐 Service URL: $SERVICE_URL"
-          echo "📦 Version: ${{ steps.tag_version.outputs.new_tag }}"
-          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "🎯 Service: ${{ env.SERVICE_NAME }}"
+          echo "🌍 Environment: Staging"
+          echo "📦 Version: ${{ github.sha }}"
 
-      # Step 11: Run smoke test
+      # Step 9: Run smoke test
       - name: Smoke test
         run: |
           SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
             --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
             --format='value(status.url)')
           echo "🔍 Running smoke test..."
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $SERVICE_URL/health)
+          # Accept 200 (OK)
           if [ $HTTP_CODE -eq 200 ]; then
-            echo "✅ Health check passed (HTTP $HTTP_CODE)"
+            echo "✅ Smoke test passed (HTTP $HTTP_CODE)"
           else
-            echo "❌ Health check failed (HTTP $HTTP_CODE)"
+            echo "❌ Smoke test failed (HTTP $HTTP_CODE)"
             exit 1
           fi
-

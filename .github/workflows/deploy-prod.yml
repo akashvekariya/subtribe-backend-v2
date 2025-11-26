@@ -1,0 +1,247 @@
+name: Deploy to Production
+
+# Automatic deployment to Production on merges to main branch
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allow manual triggering if needed
+
+# Required for semantic versioning (create tags and releases)
+permissions:
+  contents: write
+
+env:
+  # GCP Configuration
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  REGION: asia-south1 # Mumbai region
+  SERVICE_NAME: subtribe-backend-prod
+  ARTIFACT_REGISTRY_REPO: subtribe # Shared repo for all services
+
+jobs:
+  # ============================================================================
+  # Job 1: Lint & Test (runs before Production deployment)
+  # ============================================================================
+  lint-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 4: Run Ruff linter (check for errors)
+      - name: Lint with Ruff
+        run: |
+          echo "🔍 Running Ruff linter..."
+          ruff check . --output-format=github
+        continue-on-error: false
+
+      # Step 5: Run Ruff formatter check (ensure code is formatted)
+      - name: Check code formatting
+        run: |
+          echo "✨ Checking code formatting with Ruff..."
+          ruff format --check .
+        continue-on-error: false
+
+      # Step 6: Run mypy type checking
+      - name: Type check with mypy
+        run: |
+          echo "🔎 Running mypy type checker..."
+          mypy app --ignore-missing-imports --check-untyped-defs
+        continue-on-error: true  # Don't fail build on type errors (warning only)
+
+      # Step 7: Run unit tests (schemas & services only - no DB needed)
+      - name: Run unit tests
+        env:
+          DATABASE_URL: "postgresql+asyncpg://test:test@localhost:5432/test"
+          JWT_SECRET_KEY: "test-secret-key-for-ci"
+          JWT_ALGORITHM: "HS256"
+          JWT_EXPIRY_DAYS: "15"
+          REFRESH_TOKEN_EXPIRY_DAYS: "30"
+          SUPABASE_URL: "https://test.supabase.co"
+          SUPABASE_ANON_KEY: "test-anon-key"
+          SUPABASE_SERVICE_KEY: "test-service-key"
+          SUPABASE_JWT_SECRET: "test-jwt-secret"
+          GCS_BUCKET_NAME: "test-bucket"
+          GCS_PROJECT_ID: "test-project"
+          GOOGLE_APPLICATION_CREDENTIALS: "/tmp/fake-credentials.json"
+          CORS_ORIGINS: '["http://localhost:3000"]'
+          ENVIRONMENT: "testing"
+        run: |
+          echo "🧪 Running unit tests..."
+          # Create fake GCS credentials file (tests use mocks)
+          mkdir -p /tmp
+          echo '{"type": "service_account"}' > /tmp/fake-credentials.json
+          # Run ONLY pure unit tests (schemas & services - no database needed)
+          pytest tests/unit/test_schemas.py tests/unit/test_services.py -v --tb=short
+        continue-on-error: false
+
+      # Step 8: Summary
+      - name: Summary
+        if: success()
+        run: |
+          echo "✅ All checks passed!"
+          echo "   - Code linting ✓"
+          echo "   - Code formatting ✓"
+          echo "   - Type checking ✓"
+          echo "   - Unit tests (schemas & services) ✓"
+
+  # ============================================================================
+  # Job 2: Deploy to Production (after lint-test succeeds)
+  # ============================================================================
+  deploy-prod:
+    name: Build & Deploy to Cloud Run (Production)
+    runs-on: ubuntu-latest
+    needs: lint-test # Wait for lint-test to pass
+    # Use GitHub Environment for environment-specific secrets/variables
+    environment: Production
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for versioning
+
+      # Step 2: Bump version and create tag (PRODUCTION ONLY)
+      # Creates semantic version tags (v1.0.0, v1.0.1, etc.)
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch # Default to patch if no conventional commit
+          release_branches: main
+          tag_prefix: v
+
+      # Step 3: Create GitHub Release (PRODUCTION ONLY)
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          body: ${{ steps.tag_version.outputs.changelog }}
+
+      # Step 4: Authenticate with Google Cloud
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Step 5: Set up Cloud SDK
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Step 6: Configure Docker to use gcloud as credential helper
+      - name: Configure Docker
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      # Step 7: Build Docker image with Production build args
+      - name: Build Docker image
+        run: |
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag }}"
+          echo "🔨 Building Docker image for Production..."
+          echo "📦 Version: $VERSION_TAG"
+          docker build \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$VERSION_TAG \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            .
+
+      # Step 8: Push Docker image to Artifact Registry
+      - name: Push Docker image
+        run: |
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag }}"
+          echo "📦 Pushing Docker image with version $VERSION_TAG to Artifact Registry..."
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$VERSION_TAG
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+
+      # Step 9: Deploy to Cloud Run (Production)
+      - name: Deploy to Cloud Run (Production)
+        run: |
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag }}"
+          echo "🚀 Deploying version $VERSION_TAG to Cloud Run (Production)..."
+          echo "🎯 Service: ${{ env.SERVICE_NAME }}"
+          echo "🌍 Environment: Production"
+
+          # 1. Create environment variables file (YAML format)
+          # This completely avoids shell quoting and comma delimiter issues.
+          cat > env-vars.yaml << EOF
+          ENVIRONMENT: "production"
+          DATABASE_URL: "${{ secrets.DATABASE_URL }}"
+          JWT_SECRET_KEY: "${{ secrets.JWT_SECRET_KEY }}"
+          JWT_ALGORITHM: "${{ vars.JWT_ALGORITHM }}"
+          JWT_EXPIRY_DAYS: "${{ vars.JWT_EXPIRY_DAYS }}"
+          REFRESH_TOKEN_EXPIRY_DAYS: "${{ vars.REFRESH_TOKEN_EXPIRY_DAYS }}"
+          SUPABASE_URL: "${{ vars.SUPABASE_URL }}"
+          SUPABASE_ANON_KEY: "${{ vars.SUPABASE_ANON_KEY }}"
+          SUPABASE_SERVICE_KEY: "${{ secrets.SUPABASE_SERVICE_KEY }}"
+          SUPABASE_JWT_SECRET: "${{ secrets.SUPABASE_JWT_SECRET }}"
+          GCS_BUCKET_NAME: "${{ vars.GCS_BUCKET_NAME }}"
+          GCS_PROJECT_ID: "${{ vars.GCS_PROJECT_ID }}"
+          # The complex CORS value is passed here as a string value in YAML.
+          CORS_ALLOWED_ORIGINS: "${{ vars.ALLOWED_ORIGINS }}"
+          EOF
+
+          # 2. Deploy using the environment variables file
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$VERSION_TAG \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --env-vars-file=env-vars.yaml \
+            --memory=512Mi \
+            --cpu=1 \
+            --timeout=60s \
+            --concurrency=80 \
+            --max-instances=2 \
+            --min-instances=0
+
+      # Step 10: Get service URL
+      - name: Get service URL
+        run: |
+          VERSION_TAG="${{ steps.tag_version.outputs.new_tag }}"
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --format='value(status.url)')
+          echo "✅ Deployment successful!"
+          echo "🌐 Service URL: $SERVICE_URL"
+          echo "🎯 Service: ${{ env.SERVICE_NAME }}"
+          echo "🌍 Environment: Production"
+          echo "📦 Version: $VERSION_TAG"
+
+      # Step 11: Run smoke test
+      - name: Smoke test
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --format='value(status.url)')
+          echo "🔍 Running smoke test..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $SERVICE_URL/health)
+          # Accept 200 (OK)
+          if [ $HTTP_CODE -eq 200 ]; then
+            echo "✅ Smoke test passed (HTTP $HTTP_CODE)"
+          else
+            echo "❌ Smoke test failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
