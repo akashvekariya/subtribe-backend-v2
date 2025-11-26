@@ -155,6 +155,41 @@ AVAILABLE_WILDCARDS = [
     {"name": "recruiter_name", "description": "Recruiter's name (you)"},
 ]
 
+# Default fallback values for wildcards
+DEFAULT_FALLBACKS = {
+    "candidate_name": "there",
+    "job_title": "the position",
+    "company_name": "our team",
+}
+
+
+def get_email_variables(application: Application, current_user: dict) -> dict:
+    """Get standardized wildcard variables for email rendering.
+
+    Args:
+        application: Application with job and company relationships loaded
+        current_user: Current authenticated user dict
+
+    Returns:
+        Dict of wildcard name -> value for template rendering
+    """
+    company_name = "our team"  # Default fallback
+    if hasattr(application, "company") and application.company:
+        company_name = application.company.name
+
+    job_title = "the position"  # Default fallback
+    if hasattr(application, "job") and application.job:
+        job_title = application.job.title
+
+    return {
+        "candidate_name": application.first_name,
+        "candidate_full_name": f"{application.first_name} {application.last_name}",
+        "candidate_email": application.email,
+        "job_title": job_title,
+        "company_name": company_name,
+        "recruiter_name": current_user.get("full_name", "The Team"),
+    }
+
 
 class WildcardsResponse(BaseResponse):
     """Available wildcards for email templates."""
@@ -222,7 +257,7 @@ async def send_email_to_application(
     # Fetch application with job and company
     stmt = (
         select(Application)
-        .options(joinedload(Application.job))
+        .options(joinedload(Application.job), joinedload(Application.company))
         .where(
             Application.id == application_id,
             Application.company_id == current_user["company_id"],
@@ -236,24 +271,14 @@ async def send_email_to_application(
 
     # Render the email with wildcards
     template_renderer = TemplateRenderer()
-    variables = {
-        "candidate_name": application.first_name,
-        "candidate_full_name": f"{application.first_name} {application.last_name}",
-        "candidate_email": application.email,
-        "job_title": application.job.title if application.job else "the position",
-        "company_name": "Subtribe",  # TODO: Get from company record
-        "recruiter_name": current_user.get("full_name", "The Team"),
-    }
-    fallbacks = {
-        "candidate_name": "there",
-        "job_title": "the position",
-        "company_name": "our team",
-    }
+    variables = get_email_variables(application, current_user)
 
     rendered_subject = template_renderer.render_with_fallbacks(
-        request.subject, variables, fallbacks
+        request.subject, variables, DEFAULT_FALLBACKS
     )
-    rendered_body = template_renderer.render_with_fallbacks(request.body, variables, fallbacks)
+    rendered_body = template_renderer.render_with_fallbacks(
+        request.body, variables, DEFAULT_FALLBACKS
+    )
 
     email_service = EmailService(db)
 
@@ -329,10 +354,10 @@ async def send_bulk_emails(
     """Send emails to multiple candidates at once."""
     from sqlalchemy.orm import joinedload
 
-    # Fetch all applications
+    # Fetch all applications with job and company
     stmt = (
         select(Application)
-        .options(joinedload(Application.job))
+        .options(joinedload(Application.job), joinedload(Application.company))
         .where(
             Application.id.in_(request.application_ids),
             Application.company_id == current_user["company_id"],
@@ -357,25 +382,13 @@ async def send_bulk_emails(
     for application in applications:
         try:
             # Render per-application
-            variables = {
-                "candidate_name": application.first_name,
-                "candidate_full_name": f"{application.first_name} {application.last_name}",
-                "candidate_email": application.email,
-                "job_title": application.job.title if application.job else "the position",
-                "company_name": "Subtribe",
-                "recruiter_name": current_user.get("full_name", "The Team"),
-            }
-            fallbacks = {
-                "candidate_name": "there",
-                "job_title": "the position",
-                "company_name": "our team",
-            }
+            variables = get_email_variables(application, current_user)
 
             rendered_subject = template_renderer.render_with_fallbacks(
-                request.subject, variables, fallbacks
+                request.subject, variables, DEFAULT_FALLBACKS
             )
             rendered_body = template_renderer.render_with_fallbacks(
-                request.body, variables, fallbacks
+                request.body, variables, DEFAULT_FALLBACKS
             )
 
             scheduled_email = ScheduledEmail(
@@ -432,10 +445,10 @@ async def preview_email(
     """Preview what an email will look like with wildcards replaced."""
     from sqlalchemy.orm import joinedload
 
-    # Fetch application
+    # Fetch application with job and company
     stmt = (
         select(Application)
-        .options(joinedload(Application.job))
+        .options(joinedload(Application.job), joinedload(Application.company))
         .where(
             Application.id == application_id,
             Application.company_id == current_user["company_id"],
@@ -449,24 +462,14 @@ async def preview_email(
 
     # Render with actual data
     template_renderer = TemplateRenderer()
-    variables = {
-        "candidate_name": application.first_name,
-        "candidate_full_name": f"{application.first_name} {application.last_name}",
-        "candidate_email": application.email,
-        "job_title": application.job.title if application.job else "the position",
-        "company_name": "Subtribe",
-        "recruiter_name": current_user.get("full_name", "The Team"),
-    }
-    fallbacks = {
-        "candidate_name": "there",
-        "job_title": "the position",
-        "company_name": "our team",
-    }
+    variables = get_email_variables(application, current_user)
 
     rendered_subject = template_renderer.render_with_fallbacks(
-        request.subject, variables, fallbacks
+        request.subject, variables, DEFAULT_FALLBACKS
     )
-    rendered_body = template_renderer.render_with_fallbacks(request.body, variables, fallbacks)
+    rendered_body = template_renderer.render_with_fallbacks(
+        request.body, variables, DEFAULT_FALLBACKS
+    )
 
     return PreviewEmailResponse(
         success=True,
@@ -491,6 +494,46 @@ async def get_wildcards(
         success=True,
         message="Available wildcards",
         wildcards=AVAILABLE_WILDCARDS,
+    )
+
+
+@email_router.post(
+    "/scheduled/{email_id}/cancel",
+    response_model=BaseResponse,
+    summary="Cancel scheduled email",
+)
+async def cancel_scheduled_email(
+    email_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> BaseResponse:
+    """Cancel a pending scheduled email."""
+    # Fetch the scheduled email
+    stmt = select(ScheduledEmail).where(
+        ScheduledEmail.id == email_id,
+        ScheduledEmail.company_id == current_user["company_id"],
+    )
+    result = await db.execute(stmt)
+    scheduled_email = result.scalar_one_or_none()
+
+    if not scheduled_email:
+        raise HTTPException(status_code=404, detail="Scheduled email not found")
+
+    if scheduled_email.status != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot cancel email with status '{scheduled_email.status}'. Only pending emails can be cancelled.",
+        )
+
+    # Update status to cancelled
+    scheduled_email.status = "cancelled"
+    await db.commit()
+
+    logger.info(f"🚫 Cancelled scheduled email {email_id} for {scheduled_email.recipient_email}")
+
+    return BaseResponse(
+        success=True,
+        message="Email cancelled successfully",
     )
 
 

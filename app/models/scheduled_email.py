@@ -89,7 +89,7 @@ class ScheduledEmail(Base):
     # Constraints & Indexes
     __table_args__ = (
         CheckConstraint(
-            "template_type IN ('interview_invite', 'rejection')",
+            "template_type IN ('interview_invite', 'rejection', 'manual', 'bulk', 'custom')",
             name="valid_scheduled_email_template_type",
         ),
         CheckConstraint(
