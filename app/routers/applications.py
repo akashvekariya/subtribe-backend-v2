@@ -125,11 +125,15 @@ async def submit_application(
             ) from None
 
     # 6. Create application and upload resume
+    job_id = job.id
+    job_id_str = str(job.id)
+    job_company_id = job.company_id
+
     try:
         # Create application record
         application = Application(
-            job_id=job.id,
-            company_id=job.company_id,
+            job_id=job_id,
+            company_id=job_company_id,
             first_name=first_name.strip(),
             last_name=last_name.strip(),
             email=email.lower().strip(),
@@ -168,8 +172,8 @@ async def submit_application(
             partial(
                 storage_service.upload_resume,
                 file=resume.file,
-                company_id=str(job.company_id),
-                job_id=str(job.id),
+                company_id=str(job_company_id),
+                job_id=job_id_str,
                 application_id=str(application.id),
                 full_name=full_name,
                 content_type=resume.content_type,
@@ -192,7 +196,7 @@ async def submit_application(
                 "correlation_id": get_correlation_id(),
                 "event_type": "business",
                 "event": "application_creation_failed",
-                "job_id": str(job.id),
+                "job_id": job_id_str,
                 "email": email,
                 "error": str(e),
             },
@@ -211,7 +215,7 @@ async def submit_application(
             "event_type": "business",
             "event": "application_submitted",
             "application_id": str(application.id),
-            "job_id": str(job.id),
+            "job_id": job_id_str,
             "email": email,
             "first_name": first_name,
             "last_name": last_name,
