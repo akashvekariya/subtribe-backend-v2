@@ -367,9 +367,13 @@ async def send_email_to_application(
         if task_name:
             scheduled_email.cloud_task_name = task_name
             await db.commit()
-            logger.info(f"📅 Scheduled email for {application.email} at {request.scheduled_for} (Cloud Task: {task_name})")
+            logger.info(
+                f"📅 Scheduled email for {application.email} at {request.scheduled_for} (Cloud Task: {task_name})"
+            )
         else:
-            logger.warning(f"📅 Scheduled email for {application.email} at {request.scheduled_for} (No Cloud Task - manual trigger required)")
+            logger.warning(
+                f"📅 Scheduled email for {application.email} at {request.scheduled_for} (No Cloud Task - manual trigger required)"
+            )
 
         return SendEmailResponse(
             success=True,
