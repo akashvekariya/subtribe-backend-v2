@@ -60,6 +60,9 @@ class ScheduledEmail(Base):
     provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Cloud Tasks Integration
+    cloud_task_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     # Metadata (calendly_link, job_title, etc.)
     email_metadata: Mapped[dict] = mapped_column(
         "metadata", JSONB, server_default=text("'{}'::jsonb"), default=dict, nullable=False

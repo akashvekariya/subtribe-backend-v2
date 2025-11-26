@@ -208,6 +208,10 @@ jobs:
           SENDGRID_SANDBOX_MODE: "${{ vars.SENDGRID_SANDBOX_MODE }}"
           EMAIL_FROM_ADDRESS: "${{ vars.EMAIL_FROM_ADDRESS }}"
           EMAIL_FROM_NAME: "${{ vars.EMAIL_FROM_NAME }}"
+          # Cloud Tasks Configuration (for scheduled email delivery)
+          GCP_CLOUD_TASKS_QUEUE: "${{ vars.GCP_CLOUD_TASKS_QUEUE }}"
+          GCP_CLOUD_TASKS_LOCATION: "${{ env.REGION }}"
+          BACKEND_URL: "${{ vars.BACKEND_URL }}"
           EOF
 
           # 2. Deploy using the environment variables file

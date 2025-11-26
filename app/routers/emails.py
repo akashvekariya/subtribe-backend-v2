@@ -11,8 +11,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.email.cloud_tasks import cloud_tasks_scheduler
 from app.email.email_service import EmailService
 from app.email.template_renderer import TemplateRenderer
 from app.models.application import Application
@@ -331,7 +333,20 @@ async def send_email_to_application(
         await db.commit()
         await db.refresh(scheduled_email)
 
-        logger.info(f"📅 Scheduled email for {application.email} at {request.scheduled_for}")
+        # Create Cloud Task to send the email at the scheduled time
+        target_url = f"{settings.backend_url}/internal/emails/send"
+        task_name = cloud_tasks_scheduler.create_email_task(
+            scheduled_email_id=scheduled_email.id,
+            scheduled_for=request.scheduled_for,
+            target_url=target_url,
+        )
+
+        if task_name:
+            scheduled_email.cloud_task_name = task_name
+            await db.commit()
+            logger.info(f"📅 Scheduled email for {application.email} at {request.scheduled_for} (Cloud Task: {task_name})")
+        else:
+            logger.warning(f"📅 Scheduled email for {application.email} at {request.scheduled_for} (No Cloud Task - manual trigger required)")
 
         return SendEmailResponse(
             success=True,
@@ -413,6 +428,15 @@ async def send_bulk_emails(
                 else:
                     failed += 1
             else:
+                # Create Cloud Task for scheduled bulk email
+                target_url = f"{settings.backend_url}/internal/emails/send"
+                task_name = cloud_tasks_scheduler.create_email_task(
+                    scheduled_email_id=scheduled_email.id,
+                    scheduled_for=scheduled_for,
+                    target_url=target_url,
+                )
+                if task_name:
+                    scheduled_email.cloud_task_name = task_name
                 successful += 1
 
         except Exception as e:
@@ -524,6 +548,14 @@ async def cancel_scheduled_email(
             status_code=400,
             detail=f"Cannot cancel email with status '{scheduled_email.status}'. Only pending emails can be cancelled.",
         )
+
+    # Delete the Cloud Task if it exists
+    if scheduled_email.cloud_task_name:
+        deleted = cloud_tasks_scheduler.delete_task(scheduled_email.cloud_task_name)
+        if deleted:
+            logger.info(f"🗑️  Deleted Cloud Task for email {email_id}")
+        else:
+            logger.warning(f"⚠️  Failed to delete Cloud Task for email {email_id}")
 
     # Update status to cancelled
     scheduled_email.status = "cancelled"

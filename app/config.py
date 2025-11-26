@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     gcp_cloud_tasks_location: str = "asia-south1"
     email_send_time_ist: str = "17:00"  # 5 PM IST
 
+    # Backend URL (for Cloud Tasks callbacks)
+    backend_url: str = "http://localhost:8000"  # Set to Cloud Run URL in production
+
     # App Config
     cors_allowed_origins: str = (
         "http://localhost:3000,http://localhost:3001"  # Comma-separated list of allowed origins
