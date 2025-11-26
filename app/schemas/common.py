@@ -3,6 +3,13 @@
 from pydantic import BaseModel, Field
 
 
+class BaseResponse(BaseModel):
+    """Base response schema for simple success/error messages."""
+
+    success: bool = Field(..., description="Whether the operation was successful")
+    message: str = Field(..., description="Human-readable message")
+
+
 class PaginationMeta(BaseModel):
     """Pagination metadata for paginated list responses.
 

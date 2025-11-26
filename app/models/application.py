@@ -15,6 +15,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.company import Company
     from app.models.job import Job
+    from app.models.scheduled_email import ScheduledEmail
     from app.models.status_history import ApplicationStatusHistory
 
 
@@ -105,6 +106,9 @@ class Application(Base):
     company: Mapped[Company] = relationship("Company", back_populates="applications")
     status_history: Mapped[list[ApplicationStatusHistory]] = relationship(
         "ApplicationStatusHistory", back_populates="application", cascade="all, delete-orphan"
+    )
+    scheduled_emails: Mapped[list[ScheduledEmail]] = relationship(
+        "ScheduledEmail", back_populates="application", cascade="all, delete-orphan"
     )
 
     # Constraints & Indexes

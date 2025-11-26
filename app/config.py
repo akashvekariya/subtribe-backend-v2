@@ -29,6 +29,17 @@ class Settings(BaseSettings):
         "/dev/null"  # Not needed in Cloud Run (uses service account)
     )
 
+    # Email Service
+    email_enabled: bool = True
+    email_provider: str = "stub"  # "sendgrid" or "stub"
+    email_from_address: str = "noreply@thesubtribe.com"
+    email_from_name: str = "Subtribe ATS"
+    sendgrid_api_key: str = "dummy-api-key"  # Required even for stub mode
+    sendgrid_sandbox_mode: bool = True
+    gcp_cloud_tasks_queue: str = "email-queue"
+    gcp_cloud_tasks_location: str = "asia-south1"
+    email_send_time_ist: str = "17:00"  # 5 PM IST
+
     # App Config
     cors_allowed_origins: str = (
         "http://localhost:3000,http://localhost:3001"  # Comma-separated list of allowed origins

@@ -14,7 +14,9 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.application import Application
+    from app.models.email_template import EmailTemplate
     from app.models.job import Job
+    from app.models.scheduled_email import ScheduledEmail
     from app.models.user import User
 
 
@@ -81,6 +83,12 @@ class Company(Base):
     )
     applications: Mapped[list[Application]] = relationship(
         "Application", back_populates="company", cascade="all, delete-orphan"
+    )
+    email_templates: Mapped[list[EmailTemplate]] = relationship(
+        "EmailTemplate", back_populates="company", cascade="all, delete-orphan"
+    )
+    scheduled_emails: Mapped[list[ScheduledEmail]] = relationship(
+        "ScheduledEmail", back_populates="company", cascade="all, delete-orphan"
     )
 
     # Constraints

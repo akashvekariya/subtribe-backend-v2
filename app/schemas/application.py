@@ -257,3 +257,27 @@ class StatusHistoryResponse(BaseModel):
     """Response with status change history."""
 
     data: list[StatusHistoryItem]
+
+
+class ScheduledEmailItem(BaseModel):
+    """Single scheduled email entry."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    template_type: str
+    recipient_email: str
+    recipient_name: str
+    subject: str
+    scheduled_for: datetime
+    status: str
+    sent_at: datetime | None
+    provider_message_id: str | None
+    error_message: str | None
+    created_at: datetime
+
+
+class ScheduledEmailsResponse(BaseModel):
+    """Response with scheduled emails for an application."""
+
+    data: list[ScheduledEmailItem]
