@@ -20,6 +20,7 @@ exclude = [
     "*.egg-info",
     ".pytest_cache",
     "database/migrations/versions",  # Don't lint auto-generated migrations
+    "app/llm/baml",  # BAML library - auto-generated code
 ]
 
 [tool.ruff.lint]
@@ -108,6 +109,11 @@ module = [
 ]
 ignore_missing_imports = true
 
+# Exclude BAML library from type checking
+[[tool.mypy.overrides]]
+module = "app.llm.baml.*"
+ignore_errors = true
+
 # ============================================================================
 # COVERAGE - Code Coverage (Optional - for later)
 # ============================================================================
@@ -117,6 +123,7 @@ omit = [
     "*/tests/*",
     "*/migrations/*",
     "*/__pycache__/*",
+    "app/llm/baml/*",  # BAML library - auto-generated code
 ]
 
 [tool.coverage.report]

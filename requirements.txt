@@ -38,3 +38,6 @@ aiosqlite
 ruff  # Fast Python linter & formatter
 mypy  # Static type checker
 types-python-jose  # Type stubs for python-jose
+
+# AI
+baml-py
