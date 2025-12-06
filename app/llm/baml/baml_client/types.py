@@ -37,12 +37,118 @@ def get_checks(checks: typing.Dict[CheckName, Check]) -> typing.List[Check]:
 def all_succeeded(checks: typing.Dict[CheckName, Check]) -> bool:
     return all(check.status == "succeeded" for check in get_checks(checks))
 # #########################################################################
-# Generated enums (0)
+# Generated enums (3)
 # #########################################################################
 
+class RoleComplexity(str, Enum):
+    Junior = "Junior"
+    Mid = "Mid"
+    Senior = "Senior"
+    Lead = "Lead"
+    Executive = "Executive"
+
+class SkillCategory(str, Enum):
+    Technical = "Technical"
+    Soft = "Soft"
+    Domain = "Domain"
+
+class SkillImportance(str, Enum):
+    Critical = "Critical"
+    Important = "Important"
+    NiceToHave = "NiceToHave"
+
 # #########################################################################
-# Generated classes (0)
+# Generated classes (16)
 # #########################################################################
+
+class CalibrationQuestionsPayload(BaseModel):
+    skillRealityCheck: "SkillRealityCheck"
+    experienceTradeoffs: "ExperienceTradeoffs"
+    hiddenRequirements: "HiddenRequirements"
+    honestAssessment: "HonestAssessment"
+    redFlags: "RedFlagsSection"
+    roleContext: "RoleContext"
+    day60Expectations: "Day60Expectations"
+
+class Day60Expectations(BaseModel):
+    milestones: typing.List[str]
+    instruction: str
+
+class ExperienceTradeoffs(BaseModel):
+    scenarios: typing.List["TradeoffScenario"]
+
+class ExtractedSkill(BaseModel):
+    id: str
+    name: str
+    category: SkillCategory
+    mentionCount: int
+    inferredImportance: SkillImportance
+
+class HiddenRequirementOption(BaseModel):
+    id: str
+    label: str
+    description: typing.Optional[str] = None
+
+class HiddenRequirementQuestion(BaseModel):
+    id: str
+    label: str
+    type: str
+    options: typing.List["HiddenRequirementOption"]
+
+class HiddenRequirements(BaseModel):
+    questions: typing.List["HiddenRequirementQuestion"]
+
+class HonestAssessment(BaseModel):
+    challengeOptions: typing.List[str]
+    growthOpportunityQuestion: str
+    growthOptions: typing.List[str]
+    quitRiskOptions: typing.List[str]
+
+class JobInput(BaseModel):
+    title: str
+    description: str
+    positionType: str
+    department: typing.Optional[str] = None
+    locationType: str
+    experienceMin: typing.Optional[int] = None
+    experienceMax: typing.Optional[int] = None
+
+class JobOnboardingQuestionsResponse(BaseModel):
+    parsedData: "ParsedJobData"
+    calibrationQuestions: "CalibrationQuestionsPayload"
+
+class ParsedJobData(BaseModel):
+    extractedSkills: typing.List["ExtractedSkill"]
+    suggestedResponsibilities: typing.List[str]
+    roleComplexity: RoleComplexity
+    domainKeywords: typing.List[str]
+
+class RedFlagsSection(BaseModel):
+    rejectionBehaviors: typing.List[str]
+    trainableGaps: typing.List[str]
+    nonTrainableGaps: typing.List[str]
+
+class RoleContext(BaseModel):
+    roleOpenReasons: typing.List[str]
+    autonomyLevels: typing.List[str]
+    ambiguityLevels: typing.List[str]
+
+class SkillRealityCheck(BaseModel):
+    mustHaveSkills: typing.List["ExtractedSkill"]
+    goodToHaveSkills: typing.List["ExtractedSkill"]
+    instruction: str
+
+class TradeoffOption(BaseModel):
+    id: str
+    label: str
+    description: str
+    implication: str
+
+class TradeoffScenario(BaseModel):
+    id: str
+    title: str
+    description: str
+    options: typing.List["TradeoffOption"]
 
 # #########################################################################
 # Generated type aliases (0)

@@ -24,6 +24,12 @@ class LlmResponseParser:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
+    def GenerateJobOnboardingQuestions(
+        self, llm_response: str, baml_options: BamlCallOptions = {},
+    ) -> types.JobOnboardingQuestionsResponse:
+        result = self.__options.merge_options(baml_options).parse_response(function_name="GenerateJobOnboardingQuestions", llm_response=llm_response, mode="request")
+        return typing.cast(types.JobOnboardingQuestionsResponse, result)
+
     
 
 class LlmStreamParser:
@@ -31,5 +37,11 @@ class LlmStreamParser:
 
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
+
+    def GenerateJobOnboardingQuestions(
+        self, llm_response: str, baml_options: BamlCallOptions = {},
+    ) -> stream_types.JobOnboardingQuestionsResponse:
+        result = self.__options.merge_options(baml_options).parse_response(function_name="GenerateJobOnboardingQuestions", llm_response=llm_response, mode="stream")
+        return typing.cast(stream_types.JobOnboardingQuestionsResponse, result)
 
     

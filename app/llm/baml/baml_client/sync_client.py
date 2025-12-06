@@ -91,6 +91,20 @@ class BamlSyncClient:
     def parse_stream(self):
       return self.__llm_stream_parser
     
+    def GenerateJobOnboardingQuestions(self, job: types.JobInput,
+        baml_options: BamlCallOptions = {},
+    ) -> types.JobOnboardingQuestionsResponse:
+        # Check if on_tick is provided
+        if 'on_tick' in baml_options:
+            stream = self.stream.GenerateJobOnboardingQuestions(job=job,
+                baml_options=baml_options)
+            return stream.get_final_response()
+        else:
+            # Original non-streaming code
+            result = self.__options.merge_options(baml_options).call_function_sync(function_name="GenerateJobOnboardingQuestions", args={
+                "job": job,
+            })
+            return typing.cast(types.JobOnboardingQuestionsResponse, result.cast_to(types, types, stream_types, False, __runtime__))
     
 
 
@@ -100,6 +114,18 @@ class BamlStreamClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
+    def GenerateJobOnboardingQuestions(self, job: types.JobInput,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlSyncStream[stream_types.JobOnboardingQuestionsResponse, types.JobOnboardingQuestionsResponse]:
+        ctx, result = self.__options.merge_options(baml_options).create_sync_stream(function_name="GenerateJobOnboardingQuestions", args={
+            "job": job,
+        })
+        return baml_py.BamlSyncStream[stream_types.JobOnboardingQuestionsResponse, types.JobOnboardingQuestionsResponse](
+          result,
+          lambda x: typing.cast(stream_types.JobOnboardingQuestionsResponse, x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast(types.JobOnboardingQuestionsResponse, x.cast_to(types, types, stream_types, False, __runtime__)),
+          ctx,
+        )
     
 
 class BamlHttpRequestClient:
@@ -108,6 +134,13 @@ class BamlHttpRequestClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
+    def GenerateJobOnboardingQuestions(self, job: types.JobInput,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.baml_py.HTTPRequest:
+        result = self.__options.merge_options(baml_options).create_http_request_sync(function_name="GenerateJobOnboardingQuestions", args={
+            "job": job,
+        }, mode="request")
+        return result
     
 
 class BamlHttpStreamRequestClient:
@@ -116,6 +149,13 @@ class BamlHttpStreamRequestClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
+    def GenerateJobOnboardingQuestions(self, job: types.JobInput,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.baml_py.HTTPRequest:
+        result = self.__options.merge_options(baml_options).create_http_request_sync(function_name="GenerateJobOnboardingQuestions", args={
+            "job": job,
+        }, mode="stream")
+        return result
     
 
 b = BamlSyncClient(DoNotUseDirectlyCallManager({}))

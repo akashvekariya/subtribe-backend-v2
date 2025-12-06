@@ -23,8 +23,97 @@ class StreamState(BaseModel, typing.Generic[StreamStateValueT]):
     value: StreamStateValueT
     state: typing_extensions.Literal["Pending", "Incomplete", "Complete"]
 # #########################################################################
-# Generated classes (0)
+# Generated classes (16)
 # #########################################################################
+
+class CalibrationQuestionsPayload(BaseModel):
+    skillRealityCheck: typing.Optional["SkillRealityCheck"] = None
+    experienceTradeoffs: typing.Optional["ExperienceTradeoffs"] = None
+    hiddenRequirements: typing.Optional["HiddenRequirements"] = None
+    honestAssessment: typing.Optional["HonestAssessment"] = None
+    redFlags: typing.Optional["RedFlagsSection"] = None
+    roleContext: typing.Optional["RoleContext"] = None
+    day60Expectations: typing.Optional["Day60Expectations"] = None
+
+class Day60Expectations(BaseModel):
+    milestones: typing.List[str]
+    instruction: typing.Optional[str] = None
+
+class ExperienceTradeoffs(BaseModel):
+    scenarios: typing.List["TradeoffScenario"]
+
+class ExtractedSkill(BaseModel):
+    id: typing.Optional[str] = None
+    name: typing.Optional[str] = None
+    category: typing.Optional[types.SkillCategory] = None
+    mentionCount: typing.Optional[int] = None
+    inferredImportance: typing.Optional[types.SkillImportance] = None
+
+class HiddenRequirementOption(BaseModel):
+    id: typing.Optional[str] = None
+    label: typing.Optional[str] = None
+    description: typing.Optional[str] = None
+
+class HiddenRequirementQuestion(BaseModel):
+    id: typing.Optional[str] = None
+    label: typing.Optional[str] = None
+    type: typing.Optional[str] = None
+    options: typing.List["HiddenRequirementOption"]
+
+class HiddenRequirements(BaseModel):
+    questions: typing.List["HiddenRequirementQuestion"]
+
+class HonestAssessment(BaseModel):
+    challengeOptions: typing.List[str]
+    growthOpportunityQuestion: typing.Optional[str] = None
+    growthOptions: typing.List[str]
+    quitRiskOptions: typing.List[str]
+
+class JobInput(BaseModel):
+    title: typing.Optional[str] = None
+    description: typing.Optional[str] = None
+    positionType: typing.Optional[str] = None
+    department: typing.Optional[str] = None
+    locationType: typing.Optional[str] = None
+    experienceMin: typing.Optional[int] = None
+    experienceMax: typing.Optional[int] = None
+
+class JobOnboardingQuestionsResponse(BaseModel):
+    parsedData: typing.Optional["ParsedJobData"] = None
+    calibrationQuestions: typing.Optional["CalibrationQuestionsPayload"] = None
+
+class ParsedJobData(BaseModel):
+    extractedSkills: typing.List["ExtractedSkill"]
+    suggestedResponsibilities: typing.List[str]
+    roleComplexity: typing.Optional[types.RoleComplexity] = None
+    domainKeywords: typing.List[str]
+
+class RedFlagsSection(BaseModel):
+    rejectionBehaviors: typing.List[str]
+    trainableGaps: typing.List[str]
+    nonTrainableGaps: typing.List[str]
+
+class RoleContext(BaseModel):
+    roleOpenReasons: typing.List[str]
+    autonomyLevels: typing.List[str]
+    ambiguityLevels: typing.List[str]
+
+class SkillRealityCheck(BaseModel):
+    mustHaveSkills: typing.List["ExtractedSkill"]
+    goodToHaveSkills: typing.List["ExtractedSkill"]
+    instruction: typing.Optional[str] = None
+
+class TradeoffOption(BaseModel):
+    id: typing.Optional[str] = None
+    label: typing.Optional[str] = None
+    description: typing.Optional[str] = None
+    implication: typing.Optional[str] = None
+
+class TradeoffScenario(BaseModel):
+    id: typing.Optional[str] = None
+    title: typing.Optional[str] = None
+    description: typing.Optional[str] = None
+    options: typing.List["TradeoffOption"]
 
 # #########################################################################
 # Generated type aliases (0)

@@ -20,27 +20,1037 @@ from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIM
 class TypeBuilder(type_builder.TypeBuilder):
     def __init__(self):
         super().__init__(classes=set(
-          []
+          ["CalibrationQuestionsPayload","Day60Expectations","ExperienceTradeoffs","ExtractedSkill","HiddenRequirementOption","HiddenRequirementQuestion","HiddenRequirements","HonestAssessment","JobInput","JobOnboardingQuestionsResponse","ParsedJobData","RedFlagsSection","RoleContext","SkillRealityCheck","TradeoffOption","TradeoffScenario",]
         ), enums=set(
-          []
+          ["RoleComplexity","SkillCategory","SkillImportance",]
         ), runtime=DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME)
 
     # #########################################################################
-    # Generated enums 0
+    # Generated enums 3
     # #########################################################################
 
+    @property
+    def RoleComplexity(self) -> "RoleComplexityViewer":
+        return RoleComplexityViewer(self)
+
+    @property
+    def SkillCategory(self) -> "SkillCategoryViewer":
+        return SkillCategoryViewer(self)
+
+    @property
+    def SkillImportance(self) -> "SkillImportanceViewer":
+        return SkillImportanceViewer(self)
+
 
     # #########################################################################
-    # Generated classes 0
+    # Generated classes 16
     # #########################################################################
 
+    @property
+    def CalibrationQuestionsPayload(self) -> "CalibrationQuestionsPayloadViewer":
+        return CalibrationQuestionsPayloadViewer(self)
+
+    @property
+    def Day60Expectations(self) -> "Day60ExpectationsViewer":
+        return Day60ExpectationsViewer(self)
+
+    @property
+    def ExperienceTradeoffs(self) -> "ExperienceTradeoffsViewer":
+        return ExperienceTradeoffsViewer(self)
+
+    @property
+    def ExtractedSkill(self) -> "ExtractedSkillViewer":
+        return ExtractedSkillViewer(self)
+
+    @property
+    def HiddenRequirementOption(self) -> "HiddenRequirementOptionViewer":
+        return HiddenRequirementOptionViewer(self)
+
+    @property
+    def HiddenRequirementQuestion(self) -> "HiddenRequirementQuestionViewer":
+        return HiddenRequirementQuestionViewer(self)
+
+    @property
+    def HiddenRequirements(self) -> "HiddenRequirementsViewer":
+        return HiddenRequirementsViewer(self)
+
+    @property
+    def HonestAssessment(self) -> "HonestAssessmentViewer":
+        return HonestAssessmentViewer(self)
+
+    @property
+    def JobInput(self) -> "JobInputViewer":
+        return JobInputViewer(self)
+
+    @property
+    def JobOnboardingQuestionsResponse(self) -> "JobOnboardingQuestionsResponseViewer":
+        return JobOnboardingQuestionsResponseViewer(self)
+
+    @property
+    def ParsedJobData(self) -> "ParsedJobDataViewer":
+        return ParsedJobDataViewer(self)
+
+    @property
+    def RedFlagsSection(self) -> "RedFlagsSectionViewer":
+        return RedFlagsSectionViewer(self)
+
+    @property
+    def RoleContext(self) -> "RoleContextViewer":
+        return RoleContextViewer(self)
+
+    @property
+    def SkillRealityCheck(self) -> "SkillRealityCheckViewer":
+        return SkillRealityCheckViewer(self)
+
+    @property
+    def TradeoffOption(self) -> "TradeoffOptionViewer":
+        return TradeoffOptionViewer(self)
+
+    @property
+    def TradeoffScenario(self) -> "TradeoffScenarioViewer":
+        return TradeoffScenarioViewer(self)
+
 
 
 # #########################################################################
-# Generated enums 0
+# Generated enums 3
 # #########################################################################
 
+class RoleComplexityAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.enum("RoleComplexity")
+        self._values: typing.Set[str] = set([  "Junior",  "Mid",  "Senior",  "Lead",  "Executive",  ])
+        self._vals = RoleComplexityValues(self._bldr, self._values)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def values(self) -> "RoleComplexityValues":
+        return self._vals
+
+
+class RoleComplexityViewer(RoleComplexityAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_values(self) -> typing.List[typing.Tuple[str, type_builder.EnumValueViewer]]:
+        return [(name, type_builder.EnumValueViewer(self._bldr.value(name))) for name in self._values]
+    
+
+class RoleComplexityValues:
+    def __init__(self, enum_bldr: baml_py.EnumBuilder, values: typing.Set[str]):
+        self.__bldr = enum_bldr
+        self.__values = values # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def Junior(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Junior"))
+    
+    @property
+    def Mid(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Mid"))
+    
+    @property
+    def Senior(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Senior"))
+    
+    @property
+    def Lead(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Lead"))
+    
+    @property
+    def Executive(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Executive"))
+    
+    
+
+
+class SkillCategoryAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.enum("SkillCategory")
+        self._values: typing.Set[str] = set([  "Technical",  "Soft",  "Domain",  ])
+        self._vals = SkillCategoryValues(self._bldr, self._values)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def values(self) -> "SkillCategoryValues":
+        return self._vals
+
+
+class SkillCategoryViewer(SkillCategoryAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_values(self) -> typing.List[typing.Tuple[str, type_builder.EnumValueViewer]]:
+        return [(name, type_builder.EnumValueViewer(self._bldr.value(name))) for name in self._values]
+    
+
+class SkillCategoryValues:
+    def __init__(self, enum_bldr: baml_py.EnumBuilder, values: typing.Set[str]):
+        self.__bldr = enum_bldr
+        self.__values = values # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def Technical(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Technical"))
+    
+    @property
+    def Soft(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Soft"))
+    
+    @property
+    def Domain(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Domain"))
+    
+    
+
+
+class SkillImportanceAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.enum("SkillImportance")
+        self._values: typing.Set[str] = set([  "Critical",  "Important",  "NiceToHave",  ])
+        self._vals = SkillImportanceValues(self._bldr, self._values)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def values(self) -> "SkillImportanceValues":
+        return self._vals
+
+
+class SkillImportanceViewer(SkillImportanceAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_values(self) -> typing.List[typing.Tuple[str, type_builder.EnumValueViewer]]:
+        return [(name, type_builder.EnumValueViewer(self._bldr.value(name))) for name in self._values]
+    
+
+class SkillImportanceValues:
+    def __init__(self, enum_bldr: baml_py.EnumBuilder, values: typing.Set[str]):
+        self.__bldr = enum_bldr
+        self.__values = values # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def Critical(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Critical"))
+    
+    @property
+    def Important(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("Important"))
+    
+    @property
+    def NiceToHave(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("NiceToHave"))
+    
+    
+
+
 
 # #########################################################################
-# Generated classes 0
+# Generated classes 16
 # #########################################################################
+
+class CalibrationQuestionsPayloadAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("CalibrationQuestionsPayload")
+        self._properties: typing.Set[str] = set([  "skillRealityCheck",  "experienceTradeoffs",  "hiddenRequirements",  "honestAssessment",  "redFlags",  "roleContext",  "day60Expectations",  ])
+        self._props = CalibrationQuestionsPayloadProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "CalibrationQuestionsPayloadProperties":
+        return self._props
+
+
+class CalibrationQuestionsPayloadViewer(CalibrationQuestionsPayloadAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class CalibrationQuestionsPayloadProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def skillRealityCheck(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("skillRealityCheck"))
+    
+    @property
+    def experienceTradeoffs(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("experienceTradeoffs"))
+    
+    @property
+    def hiddenRequirements(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("hiddenRequirements"))
+    
+    @property
+    def honestAssessment(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("honestAssessment"))
+    
+    @property
+    def redFlags(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("redFlags"))
+    
+    @property
+    def roleContext(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("roleContext"))
+    
+    @property
+    def day60Expectations(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("day60Expectations"))
+    
+    
+
+
+class Day60ExpectationsAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("Day60Expectations")
+        self._properties: typing.Set[str] = set([  "milestones",  "instruction",  ])
+        self._props = Day60ExpectationsProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "Day60ExpectationsProperties":
+        return self._props
+
+
+class Day60ExpectationsViewer(Day60ExpectationsAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class Day60ExpectationsProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def milestones(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("milestones"))
+    
+    @property
+    def instruction(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("instruction"))
+    
+    
+
+
+class ExperienceTradeoffsAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("ExperienceTradeoffs")
+        self._properties: typing.Set[str] = set([  "scenarios",  ])
+        self._props = ExperienceTradeoffsProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "ExperienceTradeoffsProperties":
+        return self._props
+
+
+class ExperienceTradeoffsViewer(ExperienceTradeoffsAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class ExperienceTradeoffsProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def scenarios(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("scenarios"))
+    
+    
+
+
+class ExtractedSkillAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("ExtractedSkill")
+        self._properties: typing.Set[str] = set([  "id",  "name",  "category",  "mentionCount",  "inferredImportance",  ])
+        self._props = ExtractedSkillProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "ExtractedSkillProperties":
+        return self._props
+
+
+class ExtractedSkillViewer(ExtractedSkillAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class ExtractedSkillProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def id(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("id"))
+    
+    @property
+    def name(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("name"))
+    
+    @property
+    def category(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("category"))
+    
+    @property
+    def mentionCount(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("mentionCount"))
+    
+    @property
+    def inferredImportance(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("inferredImportance"))
+    
+    
+
+
+class HiddenRequirementOptionAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("HiddenRequirementOption")
+        self._properties: typing.Set[str] = set([  "id",  "label",  "description",  ])
+        self._props = HiddenRequirementOptionProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "HiddenRequirementOptionProperties":
+        return self._props
+
+
+class HiddenRequirementOptionViewer(HiddenRequirementOptionAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class HiddenRequirementOptionProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def id(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("id"))
+    
+    @property
+    def label(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("label"))
+    
+    @property
+    def description(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("description"))
+    
+    
+
+
+class HiddenRequirementQuestionAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("HiddenRequirementQuestion")
+        self._properties: typing.Set[str] = set([  "id",  "label",  "type",  "options",  ])
+        self._props = HiddenRequirementQuestionProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "HiddenRequirementQuestionProperties":
+        return self._props
+
+
+class HiddenRequirementQuestionViewer(HiddenRequirementQuestionAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class HiddenRequirementQuestionProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def id(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("id"))
+    
+    @property
+    def label(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("label"))
+    
+    @property
+    def type(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("type"))
+    
+    @property
+    def options(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("options"))
+    
+    
+
+
+class HiddenRequirementsAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("HiddenRequirements")
+        self._properties: typing.Set[str] = set([  "questions",  ])
+        self._props = HiddenRequirementsProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "HiddenRequirementsProperties":
+        return self._props
+
+
+class HiddenRequirementsViewer(HiddenRequirementsAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class HiddenRequirementsProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def questions(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("questions"))
+    
+    
+
+
+class HonestAssessmentAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("HonestAssessment")
+        self._properties: typing.Set[str] = set([  "challengeOptions",  "growthOpportunityQuestion",  "growthOptions",  "quitRiskOptions",  ])
+        self._props = HonestAssessmentProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "HonestAssessmentProperties":
+        return self._props
+
+
+class HonestAssessmentViewer(HonestAssessmentAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class HonestAssessmentProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def challengeOptions(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("challengeOptions"))
+    
+    @property
+    def growthOpportunityQuestion(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("growthOpportunityQuestion"))
+    
+    @property
+    def growthOptions(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("growthOptions"))
+    
+    @property
+    def quitRiskOptions(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("quitRiskOptions"))
+    
+    
+
+
+class JobInputAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("JobInput")
+        self._properties: typing.Set[str] = set([  "title",  "description",  "positionType",  "department",  "locationType",  "experienceMin",  "experienceMax",  ])
+        self._props = JobInputProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "JobInputProperties":
+        return self._props
+
+
+class JobInputViewer(JobInputAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class JobInputProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def title(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("title"))
+    
+    @property
+    def description(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("description"))
+    
+    @property
+    def positionType(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("positionType"))
+    
+    @property
+    def department(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("department"))
+    
+    @property
+    def locationType(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("locationType"))
+    
+    @property
+    def experienceMin(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("experienceMin"))
+    
+    @property
+    def experienceMax(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("experienceMax"))
+    
+    
+
+
+class JobOnboardingQuestionsResponseAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("JobOnboardingQuestionsResponse")
+        self._properties: typing.Set[str] = set([  "parsedData",  "calibrationQuestions",  ])
+        self._props = JobOnboardingQuestionsResponseProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "JobOnboardingQuestionsResponseProperties":
+        return self._props
+
+
+class JobOnboardingQuestionsResponseViewer(JobOnboardingQuestionsResponseAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class JobOnboardingQuestionsResponseProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def parsedData(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("parsedData"))
+    
+    @property
+    def calibrationQuestions(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("calibrationQuestions"))
+    
+    
+
+
+class ParsedJobDataAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("ParsedJobData")
+        self._properties: typing.Set[str] = set([  "extractedSkills",  "suggestedResponsibilities",  "roleComplexity",  "domainKeywords",  ])
+        self._props = ParsedJobDataProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "ParsedJobDataProperties":
+        return self._props
+
+
+class ParsedJobDataViewer(ParsedJobDataAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class ParsedJobDataProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def extractedSkills(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("extractedSkills"))
+    
+    @property
+    def suggestedResponsibilities(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("suggestedResponsibilities"))
+    
+    @property
+    def roleComplexity(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("roleComplexity"))
+    
+    @property
+    def domainKeywords(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("domainKeywords"))
+    
+    
+
+
+class RedFlagsSectionAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("RedFlagsSection")
+        self._properties: typing.Set[str] = set([  "rejectionBehaviors",  "trainableGaps",  "nonTrainableGaps",  ])
+        self._props = RedFlagsSectionProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "RedFlagsSectionProperties":
+        return self._props
+
+
+class RedFlagsSectionViewer(RedFlagsSectionAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class RedFlagsSectionProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def rejectionBehaviors(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("rejectionBehaviors"))
+    
+    @property
+    def trainableGaps(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("trainableGaps"))
+    
+    @property
+    def nonTrainableGaps(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("nonTrainableGaps"))
+    
+    
+
+
+class RoleContextAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("RoleContext")
+        self._properties: typing.Set[str] = set([  "roleOpenReasons",  "autonomyLevels",  "ambiguityLevels",  ])
+        self._props = RoleContextProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "RoleContextProperties":
+        return self._props
+
+
+class RoleContextViewer(RoleContextAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class RoleContextProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def roleOpenReasons(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("roleOpenReasons"))
+    
+    @property
+    def autonomyLevels(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("autonomyLevels"))
+    
+    @property
+    def ambiguityLevels(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("ambiguityLevels"))
+    
+    
+
+
+class SkillRealityCheckAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("SkillRealityCheck")
+        self._properties: typing.Set[str] = set([  "mustHaveSkills",  "goodToHaveSkills",  "instruction",  ])
+        self._props = SkillRealityCheckProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "SkillRealityCheckProperties":
+        return self._props
+
+
+class SkillRealityCheckViewer(SkillRealityCheckAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class SkillRealityCheckProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def mustHaveSkills(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("mustHaveSkills"))
+    
+    @property
+    def goodToHaveSkills(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("goodToHaveSkills"))
+    
+    @property
+    def instruction(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("instruction"))
+    
+    
+
+
+class TradeoffOptionAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("TradeoffOption")
+        self._properties: typing.Set[str] = set([  "id",  "label",  "description",  "implication",  ])
+        self._props = TradeoffOptionProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "TradeoffOptionProperties":
+        return self._props
+
+
+class TradeoffOptionViewer(TradeoffOptionAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class TradeoffOptionProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def id(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("id"))
+    
+    @property
+    def label(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("label"))
+    
+    @property
+    def description(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("description"))
+    
+    @property
+    def implication(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("implication"))
+    
+    
+
+
+class TradeoffScenarioAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("TradeoffScenario")
+        self._properties: typing.Set[str] = set([  "id",  "title",  "description",  "options",  ])
+        self._props = TradeoffScenarioProperties(self._bldr, self._properties)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "TradeoffScenarioProperties":
+        return self._props
+
+
+class TradeoffScenarioViewer(TradeoffScenarioAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
+        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+    
+
+
+class TradeoffScenarioProperties:
+    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def id(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("id"))
+    
+    @property
+    def title(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("title"))
+    
+    @property
+    def description(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("description"))
+    
+    @property
+    def options(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("options"))
+    
+    
+

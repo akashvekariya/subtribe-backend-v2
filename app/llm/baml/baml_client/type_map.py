@@ -16,5 +16,59 @@ from . import stream_types
 
 type_map = {
 
+    "types.CalibrationQuestionsPayload": types.CalibrationQuestionsPayload,
+    "stream_types.CalibrationQuestionsPayload": stream_types.CalibrationQuestionsPayload,
+
+    "types.Day60Expectations": types.Day60Expectations,
+    "stream_types.Day60Expectations": stream_types.Day60Expectations,
+
+    "types.ExperienceTradeoffs": types.ExperienceTradeoffs,
+    "stream_types.ExperienceTradeoffs": stream_types.ExperienceTradeoffs,
+
+    "types.ExtractedSkill": types.ExtractedSkill,
+    "stream_types.ExtractedSkill": stream_types.ExtractedSkill,
+
+    "types.HiddenRequirementOption": types.HiddenRequirementOption,
+    "stream_types.HiddenRequirementOption": stream_types.HiddenRequirementOption,
+
+    "types.HiddenRequirementQuestion": types.HiddenRequirementQuestion,
+    "stream_types.HiddenRequirementQuestion": stream_types.HiddenRequirementQuestion,
+
+    "types.HiddenRequirements": types.HiddenRequirements,
+    "stream_types.HiddenRequirements": stream_types.HiddenRequirements,
+
+    "types.HonestAssessment": types.HonestAssessment,
+    "stream_types.HonestAssessment": stream_types.HonestAssessment,
+
+    "types.JobInput": types.JobInput,
+    "stream_types.JobInput": stream_types.JobInput,
+
+    "types.JobOnboardingQuestionsResponse": types.JobOnboardingQuestionsResponse,
+    "stream_types.JobOnboardingQuestionsResponse": stream_types.JobOnboardingQuestionsResponse,
+
+    "types.ParsedJobData": types.ParsedJobData,
+    "stream_types.ParsedJobData": stream_types.ParsedJobData,
+
+    "types.RedFlagsSection": types.RedFlagsSection,
+    "stream_types.RedFlagsSection": stream_types.RedFlagsSection,
+
+    "types.RoleContext": types.RoleContext,
+    "stream_types.RoleContext": stream_types.RoleContext,
+
+    "types.SkillRealityCheck": types.SkillRealityCheck,
+    "stream_types.SkillRealityCheck": stream_types.SkillRealityCheck,
+
+    "types.TradeoffOption": types.TradeoffOption,
+    "stream_types.TradeoffOption": stream_types.TradeoffOption,
+
+    "types.TradeoffScenario": types.TradeoffScenario,
+    "stream_types.TradeoffScenario": stream_types.TradeoffScenario,
+
+
+    "types.RoleComplexity": types.RoleComplexity,
+
+    "types.SkillCategory": types.SkillCategory,
+
+    "types.SkillImportance": types.SkillImportance,
 
 }
