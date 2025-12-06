@@ -20,7 +20,13 @@ class Settings(BaseSettings):
     # Backend JWT
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
-    jwt_expiry_days: int = 20
+    jwt_expiry_days: int = 30
+
+    # Cookie Configuration
+    cookie_secure: bool = False  # Set True for production (HTTPS only)
+    cookie_samesite: str = "Lax"  # Lax, Strict, or None
+    cookie_domain: str = ""  # Empty for localhost, .yourdomain.com for production
+    cookie_max_age: int = 2592000  # 30 days in seconds
 
     # Google Cloud Storage
     gcs_bucket_name: str

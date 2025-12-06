@@ -4,13 +4,17 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+
+load_dotenv(f".env.{os.getenv('ENVIRONMENT', 'development')}")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.exceptions import register_exception_handlers
 from app.logging import LoggingMiddleware, setup_logging
-from app.routers import applications, auth, companies, dashboard, jobs
+from app.routers import applications, auth, companies, dashboard, jobs, onboarding
 
 logger = logging.getLogger(__name__)
 
@@ -128,3 +132,4 @@ app.include_router(jobs.router, prefix="/jobs")
 app.include_router(jobs.public_router, prefix="/public/jobs")
 app.include_router(applications.public_router, prefix="/public")
 app.include_router(applications.router, prefix="/applications")
+app.include_router(onboarding.router, prefix="/onboarding")
