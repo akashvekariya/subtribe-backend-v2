@@ -1,10 +1,11 @@
 """Job endpoints - CRUD operations for job postings."""
 
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,8 +13,12 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.exceptions import NotFoundError
+from app.llm.baml.baml_client import b
+from app.llm.baml.baml_client.types import JobInput
 from app.models.application import Application
 from app.models.job import Job
+
+logger = logging.getLogger(__name__)
 from app.schemas.application import (
     ApplicationListItem,
     ApplicationListResponse,
@@ -578,3 +583,59 @@ async def list_job_applications(
             page=page, limit=limit, total=total, total_pages=total_pages, has_more=has_more
         ),
     )
+
+
+# ============================================================================
+# Job Onboarding Endpoints
+# ============================================================================
+
+
+@router.post("/{job_id}/onboarding/questions", tags=["Jobs"])
+async def generate_onboarding_questions(
+    job_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate AI-powered calibration questions for job onboarding.
+
+    Fetches job details from database and generates tailored calibration questions
+    including skill assessments, trade-off scenarios, and role expectations.
+    """
+    # Fetch job and validate ownership
+    stmt = select(Job).where(
+        Job.id == job_id,
+        Job.company_id == current_user["company_id"],
+        Job.deleted_at.is_(None),
+    )
+    result = await db.execute(stmt)
+    job = result.scalar_one_or_none()
+
+    if not job:
+        raise NotFoundError(message="Job not found", code="job_not_found")
+
+    try:
+        job_input = JobInput(
+            title=job.title,
+            description=job.description,
+            positionType=job.position_type or "full_time",
+            department=job.department,
+            locationType=job.location_type or "onsite",
+            experienceMin=job.min_experience_years,
+            experienceMax=job.max_experience_years,
+        )
+
+        logger.info(
+            "Generating onboarding questions",
+            extra={"job_id": str(job_id), "user_id": current_user["user_id"]},
+        )
+
+        baml_response = b.GenerateJobOnboardingQuestions(job=job_input)
+
+        return {"jobId": str(job_id), **baml_response.model_dump()}
+
+    except Exception as e:
+        logger.exception("Failed to generate onboarding questions")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate onboarding questions: {str(e)}"
+        ) from e
