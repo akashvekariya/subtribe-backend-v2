@@ -7,13 +7,18 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class RegisterRequest(BaseModel):
-    """User registration request."""
+    """User registration request.
+
+    Two modes:
+    1. New organization: No invite_token - creates user + new org
+    2. Join via invite: With invite_token - creates user and joins existing org
+    """
 
     email: EmailStr
     password: str = Field(..., min_length=8)
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
-    company_code: str = Field(..., min_length=8, description="Company invite code")
+    invite_token: str | None = Field(None, description="Invite token to join existing organization")
 
     @field_validator("first_name", "last_name")
     @classmethod
@@ -26,17 +31,6 @@ class RegisterRequest(BaseModel):
         if len(v) > 100:
             field_name = info.field_name.replace("_", " ").title()
             raise ValueError(f"{field_name} must be 100 characters or less")
-        return v
-
-    @field_validator("company_code")
-    @classmethod
-    def validate_company_code(cls, v: str) -> str:
-        """Validate company code."""
-        if not v or not v.strip():
-            raise ValueError("Company code is required")
-        v = v.strip()
-        if len(v) < 8:
-            raise ValueError("Please enter a valid company code")
         return v
 
     @field_validator("password")
@@ -61,6 +55,18 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class VerifyEmailRequest(BaseModel):
+    """Email verification request."""
+
+    token: str = Field(..., min_length=1, description="Email verification token")
+
+
+class ResendVerificationRequest(BaseModel):
+    """Resend verification email request."""
+
+    email: EmailStr
+
+
 class CompanyResponse(BaseModel):
     """Company details in auth responses."""
 
@@ -70,6 +76,7 @@ class CompanyResponse(BaseModel):
     name: str
     slug: str
     logo_url: str | None = None
+    onboarding_completed: bool = False
 
 
 class UserResponse(BaseModel):
@@ -82,7 +89,8 @@ class UserResponse(BaseModel):
     first_name: str
     last_name: str
     avatar_url: str | None = None
-    company: CompanyResponse
+    email_verified: bool = False
+    company: CompanyResponse | None = None
 
 
 class AuthResponse(BaseModel):
@@ -91,6 +99,7 @@ class AuthResponse(BaseModel):
     user: UserResponse
     access_token: str
     expires_at: datetime
+    message: str | None = None
 
 
 class MeResponse(BaseModel):
@@ -103,5 +112,20 @@ class MeResponse(BaseModel):
     first_name: str
     last_name: str
     avatar_url: str | None = None
-    company: CompanyResponse
+    email_verified: bool = False
+    company: CompanyResponse | None = None
     last_login_at: datetime | None = None
+
+
+class VerifyEmailResponse(BaseModel):
+    """Email verification response."""
+
+    success: bool
+    message: str
+
+
+class ResendVerificationResponse(BaseModel):
+    """Resend verification email response."""
+
+    success: bool
+    message: str
