@@ -573,4 +573,5 @@ async def claim_invite(
         company=company_response,
         redirect_to=redirect_to,
         message=message,
+        access_token=access_token,
     )

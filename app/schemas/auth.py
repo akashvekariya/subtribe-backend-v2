@@ -143,5 +143,6 @@ class ClaimInviteResponse(BaseModel):
     success: bool
     invite_type: str  # 'org_creator' or 'team_member'
     company: CompanyResponse | None = None  # Only for team_member invites
-    redirect_to: str  # '/onboarding' or '/dashboard'
+    redirect_to: str  # '/onboarding' or '/'
     message: str | None = None
+    access_token: str  # New JWT with updated company_id

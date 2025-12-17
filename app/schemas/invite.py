@@ -10,12 +10,12 @@ class InviteCreate(BaseModel):
 
     email: EmailStr = Field(..., description="Email of person to invite")
     max_uses: int | None = Field(default=1, gt=0, description="Max number of uses (null = unlimited)")
-    expires_in_days: int | None = Field(default=7, gt=0, le=30, description="Days until expiry")
     invite_type: str = Field(
         default="team_member",
         description="Type of invite: 'team_member' (join org) or 'org_creator' (create new org)",
     )
     # Note: role is always "admin" - no role selection in V1
+    # Note: expiration is always 7 days - not user configurable
 
 
 class InviteUpdate(BaseModel):

@@ -258,10 +258,8 @@ async def create_invite(
             # Deactivate old invite
             existing_invite.is_active = False
 
-        # Calculate expiry
-        expires_at = None
-        if data.expires_in_days:
-            expires_at = datetime.now(timezone.utc) + timedelta(days=data.expires_in_days)
+        # Invites expire in 7 days
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
 
         # Create org_creator invite (no company_id, role defaults to admin)
         invite = Invite(
@@ -318,10 +316,8 @@ async def create_invite(
         # Deactivate old invite
         existing_invite.is_active = False
 
-    # Calculate expiry
-    expires_at = None
-    if data.expires_in_days:
-        expires_at = datetime.now(timezone.utc) + timedelta(days=data.expires_in_days)
+    # Invites expire in 7 days
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
 
     # Create team_member invite (all users are admin in V1)
     invite = Invite(
