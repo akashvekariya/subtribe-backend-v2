@@ -28,12 +28,6 @@ class Settings(BaseSettings):
     cookie_domain: str = ""  # Empty for dev, .thesubtribe.com for production
     cookie_max_age: int = 2592000  # 30 days in seconds
 
-    # Cookie Configuration
-    cookie_secure: bool = False  # False for dev (HTTP), True for prod (HTTPS)
-    cookie_samesite: str = "Lax"  # CSRF protection
-    cookie_domain: str = ""  # Empty for dev, .thesubtribe.com for prod
-    cookie_max_age: int = 2592000  # 30 days in seconds
-
     # Google Cloud Storage
     gcs_bucket_name: str
     gcs_project_id: str
@@ -55,6 +49,9 @@ class Settings(BaseSettings):
     # Backend URL (for Cloud Tasks callbacks)
     # Auto-detected from K_SERVICE env var in Cloud Run, or set manually
     backend_url: str = ""  # Empty = auto-detect in Cloud Run
+
+    # Frontend URL (for email verification links)
+    frontend_url: str = "http://localhost:3000"
 
     # App Config
     cors_allowed_origins: str = (

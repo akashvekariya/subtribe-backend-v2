@@ -15,6 +15,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.application import Application
     from app.models.email_template import EmailTemplate
+    from app.models.invite import Invite
     from app.models.job import Job
     from app.models.scheduled_email import ScheduledEmail
     from app.models.user import User
@@ -58,6 +59,11 @@ class Company(Base):
         Boolean, server_default=text("true"), default=True, nullable=False
     )
 
+    # Onboarding Status
+    onboarding_completed: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), default=False, nullable=False
+    )
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
@@ -89,6 +95,9 @@ class Company(Base):
     )
     scheduled_emails: Mapped[list[ScheduledEmail]] = relationship(
         "ScheduledEmail", back_populates="company", cascade="all, delete-orphan"
+    )
+    invites: Mapped[list[Invite]] = relationship(
+        "Invite", back_populates="company", cascade="all, delete-orphan"
     )
 
     # Constraints

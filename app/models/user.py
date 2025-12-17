@@ -14,6 +14,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.company import Company
+    from app.models.invite import Invite
     from app.models.job import Job
 
 
@@ -29,8 +30,8 @@ class User(Base):
         server_default=text("gen_random_uuid()"),
         default=uuid4,
     )
-    company_id: Mapped[UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
+    company_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=True
     )
 
     # Auth
@@ -39,6 +40,18 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Email Verification
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), default=False, nullable=False
+    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    email_verification_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    email_verification_expires_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
 
     # Profile (avatar_url is external URL - no GCS upload for MVP)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -77,9 +90,12 @@ class User(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     # Relationships
-    company: Mapped[Company] = relationship("Company", back_populates="users")
+    company: Mapped[Company | None] = relationship("Company", back_populates="users")
     created_jobs: Mapped[list[Job]] = relationship(
         "Job", back_populates="creator", foreign_keys="Job.created_by"
+    )
+    created_invites: Mapped[list[Invite]] = relationship(
+        "Invite", back_populates="creator", foreign_keys="Invite.created_by"
     )
 
     # Constraints
