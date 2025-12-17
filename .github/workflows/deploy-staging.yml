@@ -82,6 +82,9 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: "/tmp/fake-credentials.json"
           CORS_ORIGINS: '["http://localhost:3000"]'
           ENVIRONMENT: "testing"
+          EMAIL_ENABLED: "false"
+          EMAIL_PROVIDER: "stub"
+          SENDGRID_API_KEY: "test-sendgrid-key"
         run: |
           echo "🧪 Running unit tests..."
           # Create fake GCS credentials file (tests use mocks)
@@ -172,6 +175,17 @@ jobs:
           GCS_PROJECT_ID: "${{ vars.GCS_PROJECT_ID }}"
           # The complex CORS value is passed here as a string value in YAML.
           CORS_ALLOWED_ORIGINS: "${{ vars.ALLOWED_ORIGINS }}"
+          # Email Service Configuration
+          EMAIL_ENABLED: "${{ vars.EMAIL_ENABLED }}"
+          EMAIL_PROVIDER: "${{ vars.EMAIL_PROVIDER }}"
+          SENDGRID_API_KEY: "${{ secrets.SENDGRID_API_KEY }}"
+          SENDGRID_SANDBOX_MODE: "${{ vars.SENDGRID_SANDBOX_MODE }}"
+          EMAIL_FROM_ADDRESS: "${{ vars.EMAIL_FROM_ADDRESS }}"
+          EMAIL_FROM_NAME: "${{ vars.EMAIL_FROM_NAME }}"
+          # Cloud Tasks Configuration (for scheduled email delivery)
+          GCP_CLOUD_TASKS_QUEUE: "${{ vars.GCP_CLOUD_TASKS_QUEUE }}"
+          GCP_CLOUD_TASKS_LOCATION: "${{ env.REGION }}"
+          BACKEND_URL: "${{ vars.BACKEND_URL }}"
           EOF
           
           # 2. Deploy using the environment variables file

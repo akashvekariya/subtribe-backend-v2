@@ -16,6 +16,7 @@ from app.dependencies import get_correlation_id, get_current_user
 from app.exceptions import AppException, ConflictError, NotFoundError
 from app.models.application import Application
 from app.models.job import Job
+from app.models.scheduled_email import ScheduledEmail
 from app.models.status_history import ApplicationStatusHistory
 from app.schemas.application import (
     ApplicationDetail,
@@ -23,6 +24,8 @@ from app.schemas.application import (
     ApplicationSubmitted,
     JobBasic,
     ResumeUrl,
+    ScheduledEmailItem,
+    ScheduledEmailsResponse,
     StatusHistoryItem,
     StatusHistoryResponse,
     UserBasic,
@@ -122,11 +125,15 @@ async def submit_application(
             ) from None
 
     # 6. Create application and upload resume
+    job_id = job.id
+    job_id_str = str(job.id)
+    job_company_id = job.company_id
+
     try:
         # Create application record
         application = Application(
-            job_id=job.id,
-            company_id=job.company_id,
+            job_id=job_id,
+            company_id=job_company_id,
             first_name=first_name.strip(),
             last_name=last_name.strip(),
             email=email.lower().strip(),
@@ -165,8 +172,8 @@ async def submit_application(
             partial(
                 storage_service.upload_resume,
                 file=resume.file,
-                company_id=str(job.company_id),
-                job_id=str(job.id),
+                company_id=str(job_company_id),
+                job_id=job_id_str,
                 application_id=str(application.id),
                 full_name=full_name,
                 content_type=resume.content_type,
@@ -189,7 +196,7 @@ async def submit_application(
                 "correlation_id": get_correlation_id(),
                 "event_type": "business",
                 "event": "application_creation_failed",
-                "job_id": str(job.id),
+                "job_id": job_id_str,
                 "email": email,
                 "error": str(e),
             },
@@ -208,7 +215,7 @@ async def submit_application(
             "event_type": "business",
             "event": "application_submitted",
             "application_id": str(application.id),
-            "job_id": str(job.id),
+            "job_id": job_id_str,
             "email": email,
             "first_name": first_name,
             "last_name": last_name,
@@ -437,6 +444,9 @@ async def update_application_status(
                 "changed_by": str(current_user["user_id"]),
             },
         )
+
+        # Note: Auto-scheduling removed. Recruiters manually send emails via Communication tab.
+
     else:
         # Status unchanged - no history entry needed
         logger.info(
@@ -516,3 +526,60 @@ async def get_application_history(
         )
 
     return StatusHistoryResponse(data=history_items)
+
+
+@router.get(
+    "/{application_id}/scheduled-emails",
+    response_model=ScheduledEmailsResponse,
+    tags=["Applications"],
+)
+async def get_application_scheduled_emails(
+    application_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get scheduled emails for an application.
+
+    - **application_id**: Application UUID
+
+    Returns list of scheduled emails (newest first).
+    """
+    # Verify application exists and belongs to user's company
+    app_result = await db.execute(
+        select(Application).where(
+            Application.id == application_id, Application.company_id == current_user["company_id"]
+        )
+    )
+    application = app_result.scalar_one_or_none()
+
+    if not application:
+        raise NotFoundError(message="Application not found", code="application_not_found")
+
+    # Fetch scheduled emails (newest first)
+    emails_result = await db.execute(
+        select(ScheduledEmail)
+        .where(ScheduledEmail.application_id == application_id)
+        .order_by(ScheduledEmail.created_at.desc())
+    )
+    scheduled_emails = emails_result.scalars().all()
+
+    # Build response
+    email_items = [
+        ScheduledEmailItem(
+            id=email.id,
+            template_type=email.template_type,
+            recipient_email=email.recipient_email,
+            recipient_name=email.recipient_name,
+            subject=email.subject,
+            scheduled_for=email.scheduled_for,
+            status=email.status,
+            sent_at=email.sent_at,
+            provider_message_id=email.provider_message_id,
+            error_message=email.error_message,
+            created_at=email.created_at,
+        )
+        for email in scheduled_emails
+    ]
+
+    return ScheduledEmailsResponse(data=email_items)

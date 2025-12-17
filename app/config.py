@@ -28,12 +28,33 @@ class Settings(BaseSettings):
     cookie_domain: str = ""  # Empty for dev, .thesubtribe.com for production
     cookie_max_age: int = 2592000  # 30 days in seconds
 
+    # Cookie Configuration
+    cookie_secure: bool = False  # False for dev (HTTP), True for prod (HTTPS)
+    cookie_samesite: str = "Lax"  # CSRF protection
+    cookie_domain: str = ""  # Empty for dev, .thesubtribe.com for prod
+    cookie_max_age: int = 2592000  # 30 days in seconds
+
     # Google Cloud Storage
     gcs_bucket_name: str
     gcs_project_id: str
     google_application_credentials: str = (
         "/dev/null"  # Not needed in Cloud Run (uses service account)
     )
+
+    # Email Service
+    email_enabled: bool = True
+    email_provider: str = "stub"  # "sendgrid" or "stub"
+    email_from_address: str = "noreply@thesubtribe.com"
+    email_from_name: str = "Subtribe ATS"
+    sendgrid_api_key: str = "dummy-api-key"  # Required even for stub mode
+    sendgrid_sandbox_mode: bool = True
+    gcp_cloud_tasks_queue: str = "email-queue"
+    gcp_cloud_tasks_location: str = "asia-south1"
+    email_send_time_ist: str = "17:00"  # 5 PM IST
+
+    # Backend URL (for Cloud Tasks callbacks)
+    # Auto-detected from K_SERVICE env var in Cloud Run, or set manually
+    backend_url: str = ""  # Empty = auto-detect in Cloud Run
 
     # App Config
     cors_allowed_origins: str = (
