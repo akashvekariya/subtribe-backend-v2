@@ -9,9 +9,13 @@ class InviteCreate(BaseModel):
     """Create invite request."""
 
     email: EmailStr = Field(..., description="Email of person to invite")
-    role: str = Field(default="recruiter", description="Role for invited user")
     max_uses: int | None = Field(default=1, gt=0, description="Max number of uses (null = unlimited)")
     expires_in_days: int | None = Field(default=7, gt=0, le=30, description="Days until expiry")
+    invite_type: str = Field(
+        default="team_member",
+        description="Type of invite: 'team_member' (join org) or 'org_creator' (create new org)",
+    )
+    # Note: role is always "admin" - no role selection in V1
 
 
 class InviteUpdate(BaseModel):
@@ -37,6 +41,7 @@ class InviteResponse(BaseModel):
     code: str
     email: str
     role: str
+    invite_type: str  # 'team_member' or 'org_creator'
     max_uses: int | None
     uses_count: int
     expires_at: datetime | None
@@ -56,8 +61,9 @@ class InviteValidateResponse(BaseModel):
     """Invite validation response."""
 
     valid: bool
-    company_name: str | None = None
-    company_logo: str | None = None
+    invite_type: str | None = None  # 'team_member' or 'org_creator'
+    company_name: str | None = None  # Only for team_member invites
+    company_logo: str | None = None  # Only for team_member invites
     inviter_name: str | None = None
     role: str | None = None
     error: str | None = None  # "expired", "maxed_out", "inactive", "not_found"

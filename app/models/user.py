@@ -53,6 +53,12 @@ class User(Base):
         TIMESTAMP(timezone=True), nullable=True
     )
 
+    # Onboarding State (for org_creator flow)
+    # True = user claimed org_creator invite, waiting to complete onboarding
+    pending_onboarding: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), default=False, nullable=False
+    )
+
     # Profile (avatar_url is external URL - no GCS upload for MVP)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)

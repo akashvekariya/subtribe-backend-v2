@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
 
+    # Super Admin Configuration
+    # Comma-separated list of email addresses that can create org_creator invites
+    super_admin_emails: str = ""
+
     # Logging Configuration
     log_mode: str = "smart"  # full, smart, or minimal
     log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR (for app.* loggers)

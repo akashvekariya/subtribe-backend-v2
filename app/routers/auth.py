@@ -21,6 +21,8 @@ from app.models.invite import Invite
 from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
+    ClaimInviteRequest,
+    ClaimInviteResponse,
     CompanyResponse,
     LoginRequest,
     MeResponse,
@@ -180,6 +182,7 @@ def build_user_response(user: User, company: Company | None = None) -> UserRespo
         last_name=user.last_name,
         avatar_url=user.avatar_url,
         email_verified=user.email_verified,
+        pending_onboarding=user.pending_onboarding,
         company=company_response,
     )
 
@@ -191,9 +194,15 @@ async def register(response: Response, data: RegisterRequest, db: AsyncSession =
     """
     Register new user.
 
-    Two modes:
-    1. No invite_token: Creates user + new organization (user becomes admin)
-    2. With invite_token: Creates user and joins existing organization
+    Creates user account WITHOUT organization. User must claim an invite code
+    after email verification to join or create an organization.
+
+    Flow:
+    1. User registers (this endpoint)
+    2. User verifies email
+    3. User enters invite code (/auth/claim-invite)
+       - org_creator invite → User goes to onboarding to create org
+       - team_member invite → User joins existing org
     """
     # Check if email already exists
     stmt = select(User).where(User.email == data.email)
@@ -210,61 +219,17 @@ async def register(response: Response, data: RegisterRequest, db: AsyncSession =
     verification_token = generate_verification_token()
     verification_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
-    company = None
-    role = "admin"
-
-    if data.invite_token:
-        # Join existing organization via invite
-        stmt = select(Invite).where(Invite.code == data.invite_token)
-        result = await db.execute(stmt)
-        invite = result.scalar_one_or_none()
-
-        if not invite:
-            raise NotFoundError(message="Invalid invite code", code="invalid_invite")
-
-        if not invite.is_valid:
-            if invite.expires_at and datetime.now(timezone.utc) > invite.expires_at:
-                raise ValidationError(message="Invite code has expired", code="invite_expired")
-            if invite.max_uses and invite.uses_count >= invite.max_uses:
-                raise ValidationError(
-                    message="Invite code has reached maximum uses", code="invite_maxed"
-                )
-            raise ValidationError(message="Invite code is no longer active", code="invite_inactive")
-
-        # Get company from invite
-        stmt = select(Company).where(Company.id == invite.company_id)
-        result = await db.execute(stmt)
-        company = result.scalar_one_or_none()
-
-        if not company or not company.is_active:
-            raise ValidationError(message="Organization is not active", code="company_inactive")
-
-        role = invite.role
-
-        # Increment invite usage
-        invite.uses_count += 1
-
-    else:
-        # Create new organization
-        company = Company(
-            name=f"{data.first_name}'s Organization",
-            slug=generate_slug(f"{data.first_name}-org"),
-            invite_code=generate_invite_code(),
-            onboarding_completed=False,
-        )
-        db.add(company)
-        await db.flush()
-
-    # Create user
+    # Create user WITHOUT company (they'll claim invite after verification)
     user = User(
-        company_id=company.id if company else None,
+        company_id=None,  # No company until invite is claimed
         email=data.email,
         password_hash=password_hash,
         first_name=data.first_name,
         last_name=data.last_name,
-        role=role,
+        role="admin",  # All users are admin in V1
         is_active=True,
         email_verified=False,
+        pending_onboarding=False,  # Will be set to True when they claim org_creator invite
         email_verification_token=verification_token,
         email_verification_expires_at=verification_expires_at,
     )
@@ -272,16 +237,14 @@ async def register(response: Response, data: RegisterRequest, db: AsyncSession =
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    if company:
-        await db.refresh(company)
 
     # Send verification email
     await send_verification_email(user, verification_token)
 
-    # Create JWT
+    # Create JWT (no company_id yet)
     access_token, expires_at = create_access_token(
         user_id=str(user.id),
-        company_id=str(company.id) if company else None,
+        company_id=None,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
@@ -292,7 +255,7 @@ async def register(response: Response, data: RegisterRequest, db: AsyncSession =
     set_auth_cookie(response, access_token)
 
     return AuthResponse(
-        user=build_user_response(user, company),
+        user=build_user_response(user, None),
         access_token=access_token,
         expires_at=expires_at,
         message="Account created. Please check your email to verify.",
@@ -481,6 +444,133 @@ async def get_me(
         last_name=user.last_name,
         avatar_url=user.avatar_url,
         email_verified=user.email_verified,
+        pending_onboarding=user.pending_onboarding,
         company=company_response,
         last_login_at=user.last_login_at,
+    )
+
+
+@router.post("/claim-invite", response_model=ClaimInviteResponse, tags=["Auth"])
+async def claim_invite(
+    response: Response,
+    data: ClaimInviteRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Claim an invite code to join or create an organization.
+
+    This endpoint is called after email verification. It handles two invite types:
+    - org_creator: Sets pending_onboarding=True, user goes to onboarding to create org
+    - team_member: Assigns user to the invite's company immediately
+    """
+    user_id = UUID(current_user["user_id"])
+
+    # Get current user from DB
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise NotFoundError(message="User not found", code="user_not_found")
+
+    # Check if user already has a company
+    if user.company_id:
+        raise ValidationError(
+            message="You are already part of an organization",
+            code="already_has_company",
+        )
+
+    # Get invite
+    stmt = select(Invite).where(Invite.code == data.code)
+    result = await db.execute(stmt)
+    invite = result.scalar_one_or_none()
+
+    if not invite:
+        raise NotFoundError(message="Invalid invite code", code="invalid_invite")
+
+    # Security: Verify invite was intended for this user's email
+    if invite.email and invite.email.lower() != user.email.lower():
+        logger.warning(
+            f"Invite claim attempt with email mismatch: invite={invite.email}, user={user.email}"
+        )
+        raise ValidationError(
+            message="Invalid invite code",
+            code="email_mismatch",
+        )
+
+    # Check invite validity
+    if not invite.is_valid:
+        if invite.expires_at and datetime.now(timezone.utc) > invite.expires_at:
+            raise ValidationError(message="Invite code has expired", code="invite_expired")
+        if invite.max_uses and invite.uses_count >= invite.max_uses:
+            raise ValidationError(
+                message="Invite code has reached maximum uses", code="invite_maxed"
+            )
+        raise ValidationError(message="Invite code is no longer active", code="invite_inactive")
+
+    # Handle based on invite type
+    company = None
+    redirect_to = "/"
+
+    if invite.invite_type == "org_creator":
+        # org_creator: Mark user as pending onboarding
+        user.pending_onboarding = True
+        redirect_to = "/onboarding"
+        message = "Invite claimed. Please complete organization setup."
+    else:
+        # team_member: Join existing organization
+        if not invite.company_id:
+            raise ValidationError(
+                message="Invalid invite configuration", code="invalid_invite_config"
+            )
+
+        stmt = select(Company).where(Company.id == invite.company_id)
+        result = await db.execute(stmt)
+        company = result.scalar_one_or_none()
+
+        if not company or not company.is_active:
+            raise ValidationError(message="Organization is not active", code="company_inactive")
+
+        user.company_id = company.id
+        user.pending_onboarding = False
+        redirect_to = "/"
+        message = f"Welcome to {company.name}!"
+
+    # Increment invite usage
+    invite.uses_count += 1
+
+    await db.commit()
+    await db.refresh(user)
+
+    # Build company response if joining team
+    company_response = None
+    if company:
+        company_response = CompanyResponse(
+            id=str(company.id),
+            name=company.name,
+            slug=company.slug,
+            logo_url=company.logo_url,
+            onboarding_completed=company.onboarding_completed,
+        )
+
+    # Refresh JWT with updated claims
+    access_token, expires_at = create_access_token(
+        user_id=str(user.id),
+        company_id=str(company.id) if company else None,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email_verified=user.email_verified,
+    )
+
+    # Update cookie
+    set_auth_cookie(response, access_token)
+
+    return ClaimInviteResponse(
+        success=True,
+        invite_type=invite.invite_type,
+        company=company_response,
+        redirect_to=redirect_to,
+        message=message,
     )

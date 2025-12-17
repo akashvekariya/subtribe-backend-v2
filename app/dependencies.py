@@ -70,14 +70,14 @@ async def get_current_user(
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
 
         user_id = payload.get("sub")
-        company_id = payload.get("company_id")
+        company_id = payload.get("company_id")  # Can be None for users who haven't claimed invite yet
 
-        if not user_id or not company_id:
+        if not user_id:
             raise UnauthorizedError(message="Invalid token claims")
 
         return {
             "user_id": user_id,
-            "company_id": company_id,
+            "company_id": company_id,  # May be None until user claims invite
             "email": payload.get("email"),
             "first_name": payload.get("first_name"),
             "last_name": payload.get("last_name"),

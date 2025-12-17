@@ -31,6 +31,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def is_super_admin(email: str) -> bool:
+    """Check if the email is in the super admin whitelist."""
+    if not settings.super_admin_emails:
+        return False
+    admin_emails = [e.strip().lower() for e in settings.super_admin_emails.split(",") if e.strip()]
+    return email.lower() in admin_emails
+
+
 def generate_invite_code() -> str:
     """Generate a unique invite code (format: XXXXX-XXXXX)."""
     part1 = secrets.token_hex(3).upper()[:5]
@@ -48,10 +56,10 @@ def _get_email_provider():
     )
 
 
-async def send_invite_email(
+async def send_team_member_invite_email(
     invite: Invite, company: Company, inviter: User
 ) -> bool:
-    """Send invitation email to invitee."""
+    """Send invitation email to team member to join an existing organization."""
     invite_url = f"{settings.frontend_url}/invite/{invite.code}"
 
     message = EmailMessage(
@@ -79,11 +87,61 @@ If you weren't expecting this invitation, you can ignore this email.
     result = await provider.send_email(message)
 
     if result.success:
-        logger.info(f"Invite email sent to {invite.email} for company {company.name}")
+        logger.info(f"Team member invite email sent to {invite.email} for company {company.name}")
     else:
-        logger.error(f"Failed to send invite email to {invite.email}: {result.error_message}")
+        logger.error(f"Failed to send team member invite email to {invite.email}: {result.error_message}")
 
     return result.success
+
+
+async def send_org_creator_invite_email(invite: Invite, inviter: User | None = None) -> bool:
+    """Send invitation email to create a new organization on Subtribe."""
+    invite_url = f"{settings.frontend_url}/invite/{invite.code}"
+    inviter_text = f"{inviter.full_name} has" if inviter else "You have been"
+
+    message = EmailMessage(
+        to_email=invite.email,
+        to_name=None,
+        subject="You're invited to create your organization on Subtribe",
+        body=f"""Hi,
+
+{inviter_text} invited you to create your organization on Subtribe ATS.
+
+Click the link below to get started:
+{invite_url}
+
+You'll be able to:
+- Set up your organization profile
+- Invite your team members
+- Start managing your recruitment pipeline
+
+This invitation expires in 7 days.
+
+If you weren't expecting this invitation, you can ignore this email.
+
+- The Subtribe Team
+""",
+        from_email=settings.email_from_address,
+        from_name=settings.email_from_name,
+    )
+
+    provider = _get_email_provider()
+    result = await provider.send_email(message)
+
+    if result.success:
+        logger.info(f"Org creator invite email sent to {invite.email}")
+    else:
+        logger.error(f"Failed to send org creator invite email to {invite.email}: {result.error_message}")
+
+    return result.success
+
+
+# Alias for backwards compatibility
+async def send_invite_email(
+    invite: Invite, company: Company, inviter: User
+) -> bool:
+    """Send invitation email (alias for team member invites)."""
+    return await send_team_member_invite_email(invite, company, inviter)
 
 
 def build_invite_response(invite: Invite, creator: User | None = None) -> InviteResponse:
@@ -100,6 +158,7 @@ def build_invite_response(invite: Invite, creator: User | None = None) -> Invite
         code=invite.code,
         email=invite.email,
         role=invite.role,
+        invite_type=invite.invite_type,
         max_uses=invite.max_uses,
         uses_count=invite.uses_count,
         expires_at=invite.expires_at,
@@ -163,18 +222,80 @@ async def create_invite(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Create and send an invite to a team member.
+    Create and send an invite.
 
-    Creates an invite record and sends an email to the invitee.
+    Two types of invites:
+    - team_member: Invite someone to join your organization (default)
+    - org_creator: Invite someone to create their own organization (super admin only)
     """
+    user_id = UUID(current_user["user_id"])
+    user_email = current_user.get("email", "")
     company_id = current_user.get("company_id")
-    if not company_id:
-        raise ForbiddenError(
-            message="You must belong to an organization to send invites",
-            code="no_company",
+
+    # Get current user for inviter info
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    inviter = result.scalar_one_or_none()
+
+    # Handle org_creator invites (super admin only, no company required)
+    if data.invite_type == "org_creator":
+        if not is_super_admin(user_email):
+            raise ForbiddenError(
+                message="Only super administrators can create organization creator invites",
+                code="not_super_admin",
+            )
+
+        # Check if email already has an active org_creator invite
+        stmt = select(Invite).where(
+            Invite.email == data.email,
+            Invite.invite_type == "org_creator",
+            Invite.is_active == True,  # noqa: E712
+        )
+        result = await db.execute(stmt)
+        existing_invite = result.scalar_one_or_none()
+
+        if existing_invite:
+            # Deactivate old invite
+            existing_invite.is_active = False
+
+        # Calculate expiry
+        expires_at = None
+        if data.expires_in_days:
+            expires_at = datetime.now(timezone.utc) + timedelta(days=data.expires_in_days)
+
+        # Create org_creator invite (no company_id, role defaults to admin)
+        invite = Invite(
+            company_id=None,  # No company for org_creator invites
+            created_by=user_id,
+            email=data.email,
+            code=generate_invite_code(),
+            role="admin",  # Org creators are always admins
+            invite_type="org_creator",
+            max_uses=data.max_uses,
+            expires_at=expires_at,
         )
 
-    user_id = UUID(current_user["user_id"])
+        db.add(invite)
+        await db.commit()
+        await db.refresh(invite)
+
+        # Send org creator invite email
+        email_sent = await send_org_creator_invite_email(invite, inviter)
+
+        return InviteSendResponse(
+            success=True,
+            invite=build_invite_response(invite, inviter),
+            message="Organization creator invite sent successfully"
+            if email_sent
+            else "Invite created but email failed to send",
+        )
+
+    # Handle team_member invites (default behavior)
+    if not company_id:
+        raise ForbiddenError(
+            message="You must belong to an organization to send team invites",
+            code="no_company",
+        )
 
     # Get company
     stmt = select(Company).where(Company.id == UUID(company_id))
@@ -183,11 +304,6 @@ async def create_invite(
 
     if not company:
         raise NotFoundError(message="Organization not found", code="company_not_found")
-
-    # Get current user for inviter name
-    stmt = select(User).where(User.id == user_id)
-    result = await db.execute(stmt)
-    inviter = result.scalar_one_or_none()
 
     # Check if email already has an active invite for this company
     stmt = select(Invite).where(
@@ -207,13 +323,14 @@ async def create_invite(
     if data.expires_in_days:
         expires_at = datetime.now(timezone.utc) + timedelta(days=data.expires_in_days)
 
-    # Create invite
+    # Create team_member invite (all users are admin in V1)
     invite = Invite(
         company_id=UUID(company_id),
         created_by=user_id,
         email=data.email,
         code=generate_invite_code(),
-        role=data.role,
+        role="admin",  # All users are admin in V1
+        invite_type="team_member",
         max_uses=data.max_uses,
         expires_at=expires_at,
     )
@@ -222,13 +339,13 @@ async def create_invite(
     await db.commit()
     await db.refresh(invite)
 
-    # Send invite email
-    email_sent = await send_invite_email(invite, company, inviter)
+    # Send team member invite email
+    email_sent = await send_team_member_invite_email(invite, company, inviter)
 
     return InviteSendResponse(
         success=True,
         invite=build_invite_response(invite, inviter),
-        message="Invite sent successfully" if email_sent else "Invite created but email failed to send",
+        message="Team invite sent successfully" if email_sent else "Invite created but email failed to send",
     )
 
 
@@ -352,7 +469,9 @@ async def validate_invite(
     """
     Validate an invite code (public endpoint).
 
-    Returns company info if valid, error info if invalid.
+    Returns invite info if valid:
+    - For team_member invites: includes company info
+    - For org_creator invites: no company info (user will create their own org)
     """
     stmt = select(Invite).where(Invite.code == code)
     result = await db.execute(stmt)
@@ -370,14 +489,6 @@ async def validate_invite(
     if invite.max_uses and invite.uses_count >= invite.max_uses:
         return InviteValidateResponse(valid=False, error="maxed_out")
 
-    # Get company info
-    stmt = select(Company).where(Company.id == invite.company_id)
-    result = await db.execute(stmt)
-    company = result.scalar_one_or_none()
-
-    if not company or not company.is_active:
-        return InviteValidateResponse(valid=False, error="inactive")
-
     # Get inviter name
     inviter_name = None
     if invite.created_by:
@@ -387,8 +498,29 @@ async def validate_invite(
         if inviter:
             inviter_name = inviter.full_name
 
+    # Handle org_creator invites (no company)
+    if invite.invite_type == "org_creator":
+        return InviteValidateResponse(
+            valid=True,
+            invite_type="org_creator",
+            inviter_name=inviter_name,
+            role=invite.role,
+        )
+
+    # Handle team_member invites (has company)
+    if not invite.company_id:
+        return InviteValidateResponse(valid=False, error="inactive")
+
+    stmt = select(Company).where(Company.id == invite.company_id)
+    result = await db.execute(stmt)
+    company = result.scalar_one_or_none()
+
+    if not company or not company.is_active:
+        return InviteValidateResponse(valid=False, error="inactive")
+
     return InviteValidateResponse(
         valid=True,
+        invite_type="team_member",
         company_name=company.name,
         company_logo=company.logo_url,
         inviter_name=inviter_name,

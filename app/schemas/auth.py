@@ -9,16 +9,14 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 class RegisterRequest(BaseModel):
     """User registration request.
 
-    Two modes:
-    1. New organization: No invite_token - creates user + new org
-    2. Join via invite: With invite_token - creates user and joins existing org
+    Creates user account WITHOUT organization. User must claim an invite code
+    after email verification to join or create an organization.
     """
 
     email: EmailStr
     password: str = Field(..., min_length=8)
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
-    invite_token: str | None = Field(None, description="Invite token to join existing organization")
 
     @field_validator("first_name", "last_name")
     @classmethod
@@ -90,6 +88,7 @@ class UserResponse(BaseModel):
     last_name: str
     avatar_url: str | None = None
     email_verified: bool = False
+    pending_onboarding: bool = False
     company: CompanyResponse | None = None
 
 
@@ -113,6 +112,7 @@ class MeResponse(BaseModel):
     last_name: str
     avatar_url: str | None = None
     email_verified: bool = False
+    pending_onboarding: bool = False
     company: CompanyResponse | None = None
     last_login_at: datetime | None = None
 
@@ -129,3 +129,19 @@ class ResendVerificationResponse(BaseModel):
 
     success: bool
     message: str
+
+
+class ClaimInviteRequest(BaseModel):
+    """Request to claim an invite code."""
+
+    code: str = Field(..., min_length=1, description="Invite code (e.g., XXXXX-XXXXX)")
+
+
+class ClaimInviteResponse(BaseModel):
+    """Response after claiming an invite."""
+
+    success: bool
+    invite_type: str  # 'org_creator' or 'team_member'
+    company: CompanyResponse | None = None  # Only for team_member invites
+    redirect_to: str  # '/onboarding' or '/dashboard'
+    message: str | None = None
