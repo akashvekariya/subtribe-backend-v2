@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.exceptions import register_exception_handlers
 from app.logging import LoggingMiddleware, setup_logging
-from app.routers import applications, auth, companies, dashboard, emails, jobs
+from app.routers import applications, auth, companies, dashboard, emails, invites, jobs
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +122,7 @@ async def health_check():
 
 
 app.include_router(auth.router, prefix="/auth")
+app.include_router(invites.router, prefix="/invites")
 app.include_router(companies.router, prefix="/companies")
 app.include_router(dashboard.router, prefix="/dashboard")
 app.include_router(jobs.router, prefix="/jobs")
