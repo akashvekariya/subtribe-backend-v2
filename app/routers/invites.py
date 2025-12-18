@@ -56,9 +56,7 @@ def _get_email_provider():
     )
 
 
-async def send_team_member_invite_email(
-    invite: Invite, company: Company, inviter: User
-) -> bool:
+async def send_team_member_invite_email(invite: Invite, company: Company, inviter: User) -> bool:
     """Send invitation email to team member to join an existing organization."""
     invite_url = f"{settings.frontend_url}/invite/{invite.code}"
 
@@ -89,7 +87,9 @@ If you weren't expecting this invitation, you can ignore this email.
     if result.success:
         logger.info(f"Team member invite email sent to {invite.email} for company {company.name}")
     else:
-        logger.error(f"Failed to send team member invite email to {invite.email}: {result.error_message}")
+        logger.error(
+            f"Failed to send team member invite email to {invite.email}: {result.error_message}"
+        )
 
     return result.success
 
@@ -131,15 +131,15 @@ If you weren't expecting this invitation, you can ignore this email.
     if result.success:
         logger.info(f"Org creator invite email sent to {invite.email}")
     else:
-        logger.error(f"Failed to send org creator invite email to {invite.email}: {result.error_message}")
+        logger.error(
+            f"Failed to send org creator invite email to {invite.email}: {result.error_message}"
+        )
 
     return result.success
 
 
 # Alias for backwards compatibility
-async def send_invite_email(
-    invite: Invite, company: Company, inviter: User
-) -> bool:
+async def send_invite_email(invite: Invite, company: Company, inviter: User) -> bool:
     """Send invitation email (alias for team member invites)."""
     return await send_team_member_invite_email(invite, company, inviter)
 
@@ -348,7 +348,9 @@ async def create_invite(
     return InviteSendResponse(
         success=True,
         invite=build_invite_response(invite, inviter),
-        message="Team invite sent successfully" if email_sent else "Invite created but email failed to send",
+        message="Team invite sent successfully"
+        if email_sent
+        else "Invite created but email failed to send",
     )
 
 

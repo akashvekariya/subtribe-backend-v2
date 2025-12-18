@@ -110,7 +110,12 @@ async def update_company(
     return company
 
 
-@router.post("/onboarding", response_model=OnboardingResponse, status_code=status.HTTP_200_OK, tags=["Companies"])
+@router.post(
+    "/onboarding",
+    response_model=OnboardingResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Companies"],
+)
 async def complete_onboarding(
     data: OnboardingRequest,
     response: Response,

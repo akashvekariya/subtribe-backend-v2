@@ -334,9 +334,10 @@ async def verify_email(data: VerifyEmailRequest, db: AsyncSession = Depends(get_
         return VerifyEmailResponse(success=True, message="Email already verified")
 
     # Check if token expired
-    if user.email_verification_expires_at and datetime.now(
-        timezone.utc
-    ) > user.email_verification_expires_at:
+    if (
+        user.email_verification_expires_at
+        and datetime.now(timezone.utc) > user.email_verification_expires_at
+    ):
         raise ValidationError(
             message="Verification token has expired. Please request a new one.",
             code="token_expired",

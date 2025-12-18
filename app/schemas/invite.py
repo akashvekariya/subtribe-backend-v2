@@ -9,7 +9,9 @@ class InviteCreate(BaseModel):
     """Create invite request."""
 
     email: EmailStr = Field(..., description="Email of person to invite")
-    max_uses: int | None = Field(default=1, gt=0, description="Max number of uses (null = unlimited)")
+    max_uses: int | None = Field(
+        default=1, gt=0, description="Max number of uses (null = unlimited)"
+    )
     invite_type: str = Field(
         default="team_member",
         description="Type of invite: 'team_member' (join org) or 'org_creator' (create new org)",
