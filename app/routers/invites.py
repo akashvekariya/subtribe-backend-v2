@@ -13,7 +13,7 @@ from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.email.providers import EmailMessage, SendGridEmailProvider, StubEmailProvider
-from app.exceptions import ForbiddenError, NotFoundError
+from app.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.models.company import Company
 from app.models.invite import Invite
 from app.models.user import User

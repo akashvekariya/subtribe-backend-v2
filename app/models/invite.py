@@ -104,9 +104,7 @@ class Invite(Base):
             return False
         if self.expires_at and datetime.now(timezone.utc) > self.expires_at:
             return False
-        if self.max_uses is not None and self.uses_count >= self.max_uses:
-            return False
-        return True
+        return not (self.max_uses is not None and self.uses_count >= self.max_uses)
 
     def __repr__(self) -> str:
         return f"<Invite(id={self.id}, email={self.email}, company_id={self.company_id})>"
