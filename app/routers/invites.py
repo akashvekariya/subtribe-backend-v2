@@ -232,6 +232,13 @@ async def create_invite(
     user_email = current_user.get("email", "")
     company_id = current_user.get("company_id")
 
+    # Prevent self-invites
+    if data.email.lower() == user_email.lower():
+        raise ValidationError(
+            message="You cannot send an invite to yourself",
+            code="self_invite",
+        )
+
     # Get current user for inviter info
     stmt = select(User).where(User.id == user_id)
     result = await db.execute(stmt)
