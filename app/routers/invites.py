@@ -58,7 +58,7 @@ def _get_email_provider():
 
 async def send_team_member_invite_email(invite: Invite, company: Company, inviter: User) -> bool:
     """Send invitation email to team member to join an existing organization."""
-    invite_url = f"{settings.frontend_url}/invite/{invite.code}"
+    invite_url = f"{settings.dashboard_url}/invite/{invite.code}"
 
     message = EmailMessage(
         to_email=invite.email,
@@ -96,7 +96,7 @@ If you weren't expecting this invitation, you can ignore this email.
 
 async def send_org_creator_invite_email(invite: Invite, inviter: User | None = None) -> bool:
     """Send invitation email to create a new organization on Subtribe."""
-    invite_url = f"{settings.frontend_url}/invite/{invite.code}"
+    invite_url = f"{settings.dashboard_url}/invite/{invite.code}"
     inviter_text = f"{inviter.full_name} has" if inviter else "You have been"
 
     message = EmailMessage(

@@ -114,7 +114,7 @@ def _get_email_provider():
 
 async def send_verification_email(user: User, token: str) -> bool:
     """Send email verification email."""
-    verification_url = f"{settings.frontend_url}/verify-email/{token}"
+    verification_url = f"{settings.dashboard_url}/verify-email/{token}"
 
     message = EmailMessage(
         to_email=user.email,

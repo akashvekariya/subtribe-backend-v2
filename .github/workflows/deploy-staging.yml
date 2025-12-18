@@ -186,6 +186,8 @@ jobs:
           GCP_CLOUD_TASKS_QUEUE: "${{ vars.GCP_CLOUD_TASKS_QUEUE }}"
           GCP_CLOUD_TASKS_LOCATION: "${{ env.REGION }}"
           BACKEND_URL: "${{ vars.BACKEND_URL }}"
+          # Dashboard URL (for email links - invites, verification)
+          DASHBOARD_URL: "${{ vars.DASHBOARD_URL }}"
           EOF
           
           # 2. Deploy using the environment variables file

@@ -50,8 +50,9 @@ class Settings(BaseSettings):
     # Auto-detected from K_SERVICE env var in Cloud Run, or set manually
     backend_url: str = ""  # Empty = auto-detect in Cloud Run
 
-    # Frontend URL (for email verification links)
-    frontend_url: str = "http://localhost:3000"
+    # Dashboard URL (for email links - invite, verification)
+    # Set via DASHBOARD_URL env var in deployed environments
+    dashboard_url: str = "http://localhost:3000"
 
     # App Config
     cors_allowed_origins: str = (
