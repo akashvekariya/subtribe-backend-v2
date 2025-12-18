@@ -23,12 +23,10 @@ class TestAuthSchemas:
             password="SecurePass123!",
             first_name="Test",
             last_name="User",
-            company_code="ACME-x7k9p2",
         )
         assert data.email == "test@example.com"
         assert data.first_name == "Test"
         assert data.last_name == "User"
-        assert data.company_code == "ACME-x7k9p2"
 
     def test_user_register_invalid_email(self):
         """Test registration with invalid email."""
@@ -38,7 +36,6 @@ class TestAuthSchemas:
                 password="SecurePass123!",
                 first_name="Test",
                 last_name="User",
-                company_code="ACME-x7k9p2",
             )
         assert "email" in str(exc_info.value).lower()
 
