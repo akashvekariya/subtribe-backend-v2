@@ -66,16 +66,18 @@ async def send_team_member_invite_email(invite: Invite, company: Company, invite
         subject=f"You're invited to join {company.name} on Subtribe",
         body=f"""Hi,
 
-{inviter.full_name} has invited you to join {company.name} on Subtribe ATS.
+{inviter.full_name} has invited you to join {company.name} on Subtribe.
 
 Click the link below to accept the invitation:
 {invite_url}
+
+Your invite code: {invite.code}
 
 This invitation expires in 7 days.
 
 If you weren't expecting this invitation, you can ignore this email.
 
-- The Subtribe Team
+- Team Subtribe
 """,
         from_email=settings.email_from_address,
         from_name=settings.email_from_name,
@@ -105,10 +107,12 @@ async def send_org_creator_invite_email(invite: Invite, inviter: User | None = N
         subject="You're invited to create your organization on Subtribe",
         body=f"""Hi,
 
-{inviter_text} invited you to create your organization on Subtribe ATS.
+{inviter_text} invited you to create your organization on Subtribe.
 
 Click the link below to get started:
 {invite_url}
+
+Your invite code: {invite.code}
 
 You'll be able to:
 - Set up your organization profile
@@ -119,7 +123,7 @@ This invitation expires in 7 days.
 
 If you weren't expecting this invitation, you can ignore this email.
 
-- The Subtribe Team
+- Team Subtribe
 """,
         from_email=settings.email_from_address,
         from_name=settings.email_from_name,

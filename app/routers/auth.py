@@ -122,7 +122,7 @@ async def send_verification_email(user: User, token: str) -> bool:
         subject="Verify your Subtribe account",
         body=f"""Hi {user.first_name},
 
-Please verify your email address to complete your Subtribe ATS registration.
+Please verify your email address to complete your Subtribe registration.
 
 Click the link below to verify:
 {verification_url}
@@ -131,7 +131,7 @@ This link expires in 24 hours.
 
 If you didn't create this account, you can ignore this email.
 
-- The Subtribe Team
+- Team Subtribe
 """,
         from_email=settings.email_from_address,
         from_name=settings.email_from_name,
