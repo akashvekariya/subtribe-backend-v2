@@ -206,6 +206,7 @@ async def complete_onboarding(
             "secure": settings.cookie_secure,
             "samesite": settings.cookie_samesite,
             "max_age": settings.cookie_max_age,
+            "path": "/",
         }
         if settings.cookie_domain:
             cookie_kwargs["domain"] = settings.cookie_domain

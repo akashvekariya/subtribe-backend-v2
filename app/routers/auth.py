@@ -157,6 +157,7 @@ def set_auth_cookie(response: Response, token: str) -> None:
         "secure": settings.cookie_secure,
         "samesite": settings.cookie_samesite,
         "max_age": settings.cookie_max_age,
+        "path": "/",
     }
     if settings.cookie_domain:
         cookie_kwargs["domain"] = settings.cookie_domain
@@ -395,7 +396,7 @@ async def logout(response: Response):
     """
     Logout user by clearing authentication cookie.
     """
-    delete_kwargs = {"key": "access_token"}
+    delete_kwargs = {"key": "access_token", "path": "/"}
     if settings.cookie_domain:
         delete_kwargs["domain"] = settings.cookie_domain
     response.delete_cookie(**delete_kwargs)
