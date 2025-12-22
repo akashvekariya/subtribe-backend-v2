@@ -214,6 +214,11 @@ jobs:
           BACKEND_URL: "${{ vars.BACKEND_URL }}"
           # Dashboard URL (for email links - invites, verification)
           DASHBOARD_URL: "${{ vars.DASHBOARD_URL }}"
+          # Cookie Configuration (HTTP-only cookie authentication)
+          COOKIE_SECURE: "true"
+          COOKIE_SAMESITE: "None"
+          COOKIE_DOMAIN: "${{ vars.COOKIE_DOMAIN }}"
+          COOKIE_MAX_AGE: "2592000"
           EOF
 
           # 2. Deploy using the environment variables file
