@@ -322,7 +322,9 @@ async def get_resume_view_url(
         ) from e
 
 
-@router.get("/{application_id}/resume/download", response_class=RedirectResponse, tags=["Applications"])
+@router.get(
+    "/{application_id}/resume/download", response_class=RedirectResponse, tags=["Applications"]
+)
 async def download_resume(
     application_id: UUID,
     current_user: dict = Depends(get_current_user),
