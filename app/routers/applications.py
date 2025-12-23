@@ -7,7 +7,6 @@ from functools import partial
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
-from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -322,20 +321,18 @@ async def get_resume_view_url(
         ) from e
 
 
-@router.get(
-    "/{application_id}/resume/download", response_class=RedirectResponse, tags=["Applications"]
-)
-async def download_resume(
+@router.get("/{application_id}/resume/download", response_model=ResumeUrl, tags=["Applications"])
+async def get_resume_download_url(
     application_id: UUID,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Download resume file directly.
+    Get signed URL for downloading resume (forces browser download).
 
     - **application_id**: Application UUID
 
-    Redirects to signed GCS URL with attachment disposition (triggers browser download).
+    Returns signed URL with 1-hour expiry (attachment disposition).
     """
     # Fetch application
     result = await db.execute(
@@ -354,9 +351,13 @@ async def download_resume(
         signed_url = await loop.run_in_executor(
             None, storage_service.get_resume_download_url, application.resume_url
         )
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
-        # Redirect to signed URL - browser will download due to content-disposition: attachment
-        return RedirectResponse(url=signed_url, status_code=307)
+        return ResumeUrl(
+            url=signed_url,
+            filename=application.resume_filename or "resume.pdf",
+            expires_at=expires_at,
+        )
     except Exception as e:
         logger.error(
             "Failed to generate resume download URL",
