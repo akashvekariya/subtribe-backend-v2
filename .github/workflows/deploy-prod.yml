@@ -199,6 +199,8 @@ jobs:
           SUPABASE_JWT_SECRET: "${{ secrets.SUPABASE_JWT_SECRET }}"
           GCS_BUCKET_NAME: "${{ vars.GCS_BUCKET_NAME }}"
           GCS_PROJECT_ID: "${{ vars.GCS_PROJECT_ID }}"
+          # GCS Service Account credentials (mounted secret file)
+          GOOGLE_APPLICATION_CREDENTIALS: "/secrets/gcs-sa-key.json"
           # The complex CORS value is passed here as a string value in YAML.
           CORS_ALLOWED_ORIGINS: "${{ vars.ALLOWED_ORIGINS }}"
           # Email Service Configuration
@@ -222,6 +224,7 @@ jobs:
           EOF
 
           # 2. Deploy using the environment variables file
+          # Mount GCS service account key from Secret Manager for signed URL generation
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$VERSION_TAG \
             --region=${{ env.REGION }} \
@@ -229,6 +232,7 @@ jobs:
             --platform=managed \
             --allow-unauthenticated \
             --env-vars-file=env-vars.yaml \
+            --set-secrets=/secrets/gcs-sa-key.json=gcs-sa-key:latest \
             --memory=512Mi \
             --cpu=1 \
             --timeout=60s \
