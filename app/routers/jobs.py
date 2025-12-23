@@ -513,6 +513,17 @@ async def list_job_applications(
     status_filter: str | None = Query(
         None, alias="status", pattern="^(applied|screening|interviewing|offer|hired|rejected)$"
     ),
+    search: str | None = Query(None, max_length=100, description="Search by name or email"),
+    sort_by: str | None = Query(
+        None,
+        pattern="^(applied_at|name|status|ai_score)$",
+        description="Sort field",
+    ),
+    sort_dir: str | None = Query(
+        None,
+        pattern="^(asc|desc)$",
+        description="Sort direction",
+    ),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=50),
     current_user: dict = Depends(get_current_user),
@@ -523,6 +534,9 @@ async def list_job_applications(
 
     - **job_id**: Job UUID
     - **status**: Filter by status (optional)
+    - **search**: Search by candidate name or email (optional)
+    - **sort_by**: Sort field - applied_at, name, status, ai_score (optional)
+    - **sort_dir**: Sort direction - asc or desc (optional, default: desc)
     - **page**: Page number (default: 1)
     - **limit**: Items per page (default: 20, max: 50)
 
@@ -545,10 +559,38 @@ async def list_job_applications(
     if status_filter:
         query = query.where(Application.status == status_filter)
 
-    # Order by most recent first
-    query = query.order_by(Application.applied_at.desc())
+    # 3. Apply search filter (name or email)
+    if search:
+        search_term = f"%{search.lower()}%"
+        query = query.where(
+            (func.lower(Application.first_name).like(search_term))
+            | (func.lower(Application.last_name).like(search_term))
+            | (func.lower(Application.email).like(search_term))
+            | (
+                func.lower(func.concat(Application.first_name, " ", Application.last_name)).like(
+                    search_term
+                )
+            )
+        )
 
-    # 3. Get total count (excluding soft-deleted)
+    # 4. Apply sorting
+    sort_direction = sort_dir or "desc"
+    if sort_by == "name":
+        sort_column = Application.first_name
+    elif sort_by == "status":
+        sort_column = Application.status
+    elif sort_by == "ai_score":
+        sort_column = Application.ai_score
+    else:
+        # Default to applied_at
+        sort_column = Application.applied_at
+
+    if sort_direction == "asc":
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+
+    # 5. Get total count (excluding soft-deleted, with filters applied)
     count_query = (
         select(func.count())
         .select_from(Application)
@@ -556,19 +598,31 @@ async def list_job_applications(
     )
     if status_filter:
         count_query = count_query.where(Application.status == status_filter)
+    if search:
+        search_term = f"%{search.lower()}%"
+        count_query = count_query.where(
+            (func.lower(Application.first_name).like(search_term))
+            | (func.lower(Application.last_name).like(search_term))
+            | (func.lower(Application.email).like(search_term))
+            | (
+                func.lower(func.concat(Application.first_name, " ", Application.last_name)).like(
+                    search_term
+                )
+            )
+        )
 
     total_result = await db.execute(count_query)
     total = total_result.scalar()
 
-    # 4. Apply pagination
+    # 6. Apply pagination
     offset = (page - 1) * limit
     query = query.offset(offset).limit(limit)
 
-    # 5. Execute query
+    # 7. Execute query
     result = await db.execute(query)
     applications = result.scalars().all()
 
-    # 6. Build response
+    # 8. Build response
     total_pages = (total + limit - 1) // limit  # Ceiling division
     has_more = page < total_pages
 
