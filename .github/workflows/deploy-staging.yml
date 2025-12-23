@@ -190,8 +190,8 @@ jobs:
           DASHBOARD_URL: "${{ vars.DASHBOARD_URL }}"
           # Cookie Configuration (HTTP-only cookie authentication)
           COOKIE_SECURE: "true"
-          COOKIE_SAMESITE: "None"
-          COOKIE_DOMAIN: ""
+          COOKIE_SAMESITE: "Lax"
+          COOKIE_DOMAIN: ".thesubtribe.com"
           COOKIE_MAX_AGE: "2592000"
           EOF
           
