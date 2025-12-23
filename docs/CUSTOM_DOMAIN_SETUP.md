@@ -29,8 +29,9 @@ See: https://cloud.google.com/run/docs/mapping-custom-domains
 
 | Service | Staging | Production |
 |---------|---------|------------|
-| **Frontend** | `https://dashboard-staging.thesubtribe.com` | `https://dashboard.thesubtribe.com` |
-| **Backend** | `https://api-staging.thesubtribe.com` | `https://api.thesubtribe.com` |
+| **App (Public)** | `https://www-staging.thesubtribe.com` | `https://www.thesubtribe.com` |
+| **Dashboard** | `https://dashboard-staging.thesubtribe.com` | `https://dashboard.thesubtribe.com` |
+| **Backend API** | `https://api-staging.thesubtribe.com` | `https://api.thesubtribe.com` |
 
 ---
 
@@ -80,28 +81,44 @@ Now that services are in asia-east1, add custom domain mappings.
 #### Via gcloud CLI (Recommended)
 
 ```bash
-# Backend Staging
+# === STAGING ===
+
+# App (Public) Staging
 gcloud beta run domain-mappings create \
-  --service=subtribe-backend-staging \
-  --domain=api-staging.thesubtribe.com \
+  --service=subtribe-app-staging \
+  --domain=www-staging.thesubtribe.com \
   --region=asia-east1
 
-# Frontend Staging
+# Dashboard Staging
 gcloud beta run domain-mappings create \
   --service=subtribe-dashboard-staging \
   --domain=dashboard-staging.thesubtribe.com \
   --region=asia-east1
 
-# Backend Production
+# Backend API Staging
 gcloud beta run domain-mappings create \
-  --service=subtribe-backend-prod \
-  --domain=api.thesubtribe.com \
+  --service=subtribe-backend-staging \
+  --domain=api-staging.thesubtribe.com \
   --region=asia-east1
 
-# Frontend Production
+# === PRODUCTION ===
+
+# App (Public) Production
+gcloud beta run domain-mappings create \
+  --service=subtribe-app-prod \
+  --domain=www.thesubtribe.com \
+  --region=asia-east1
+
+# Dashboard Production
 gcloud beta run domain-mappings create \
   --service=subtribe-dashboard-prod \
   --domain=dashboard.thesubtribe.com \
+  --region=asia-east1
+
+# Backend API Production
+gcloud beta run domain-mappings create \
+  --service=subtribe-backend-prod \
+  --domain=api.thesubtribe.com \
   --region=asia-east1
 ```
 
@@ -133,10 +150,12 @@ Add these CNAME records (proxy **OFF** - grey cloud):
 
 | Type | Name | Target | Proxy |
 |------|------|--------|-------|
-| CNAME | `api-staging` | `ghs.googlehosted.com` | **OFF** (grey) |
+| CNAME | `www-staging` | `ghs.googlehosted.com` | **OFF** (grey) |
+| CNAME | `www` | `ghs.googlehosted.com` | **OFF** (grey) |
 | CNAME | `dashboard-staging` | `ghs.googlehosted.com` | **OFF** (grey) |
-| CNAME | `api` | `ghs.googlehosted.com` | **OFF** (grey) |
 | CNAME | `dashboard` | `ghs.googlehosted.com` | **OFF** (grey) |
+| CNAME | `api-staging` | `ghs.googlehosted.com` | **OFF** (grey) |
+| CNAME | `api` | `ghs.googlehosted.com` | **OFF** (grey) |
 
 **IMPORTANT**: Proxy MUST be **OFF** (grey cloud). GCP handles SSL certificates.
 
