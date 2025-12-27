@@ -15,6 +15,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.company import Company
     from app.models.job import Job
+    from app.models.support import SupportTicket
 
 
 class User(Base):
@@ -80,6 +81,9 @@ class User(Base):
     company: Mapped[Company] = relationship("Company", back_populates="users")
     created_jobs: Mapped[list[Job]] = relationship(
         "Job", back_populates="creator", foreign_keys="Job.created_by"
+    )
+    support_tickets: Mapped[list[SupportTicket]] = relationship(
+        "SupportTicket", back_populates="user"
     )
 
     # Constraints

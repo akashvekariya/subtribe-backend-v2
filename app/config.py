@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     log_response_body: bool = True  # Log response bodies (can override per route)
     third_party_log_level: str = "WARNING"  # Log level for ALL third-party libraries
 
+    # Discord Integration (Support Widget)
+    discord_enabled: bool = False  # Enable/disable Discord integration
+    discord_bot_token: str = ""  # Bot token for API calls
+    discord_guild_id: str = ""  # Server/Guild ID
+    discord_support_channel_id: str = ""  # Channel ID for support tickets
+    discord_webhook_secret: str = ""  # Secret for webhook validation
+
     model_config = SettingsConfigDict(
         env_file=f".env.{os.getenv('ENVIRONMENT', 'development')}",
         env_file_encoding="utf-8",

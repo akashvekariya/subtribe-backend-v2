@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from app.models.email_template import EmailTemplate
     from app.models.job import Job
     from app.models.scheduled_email import ScheduledEmail
+    from app.models.support import SupportTicket
     from app.models.user import User
 
 
@@ -89,6 +90,9 @@ class Company(Base):
     )
     scheduled_emails: Mapped[list[ScheduledEmail]] = relationship(
         "ScheduledEmail", back_populates="company", cascade="all, delete-orphan"
+    )
+    support_tickets: Mapped[list[SupportTicket]] = relationship(
+        "SupportTicket", back_populates="company", cascade="all, delete-orphan"
     )
 
     # Constraints
