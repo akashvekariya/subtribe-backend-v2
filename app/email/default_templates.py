@@ -25,7 +25,7 @@ Best regards,
 {company_name} Hiring Team
 
 ---
-This is an automated message from Subtribe ATS. Please do not reply directly to this email.""",
+This is an automated message from Subtribe. Please do not reply directly to this email.""",
     },
     "rejection": {
         "subject": "Update on Your Application - {job_title} at {company_name}",
@@ -43,7 +43,7 @@ Best regards,
 {company_name} Hiring Team
 
 ---
-This is an automated message from Subtribe ATS. Please do not reply directly to this email.""",
+This is an automated message from Subtribe. Please do not reply directly to this email.""",
     },
 }
 

@@ -112,5 +112,57 @@ class CompanyResponse(BaseModel):
     settings: dict
     plan: str
     is_active: bool
+    onboarding_completed: bool = False
     created_at: datetime
     updated_at: datetime
+
+
+class OnboardingRequest(BaseModel):
+    """Schema for completing onboarding (POST /companies/onboarding)."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    slug: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-z0-9-]+$")
+    logo_url: str | None = Field(None, max_length=3000)
+    tagline: str | None = Field(None, max_length=500)
+    about: str | None = Field(None, max_length=20000)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate company name."""
+        v = v.strip()
+        if not v:
+            raise ValueError("Company name is required")
+        return v
+
+    @field_validator("slug")
+    @classmethod
+    def validate_slug(cls, v: str) -> str:
+        """Validate company slug."""
+        v = v.strip().lower()
+        if not v:
+            raise ValueError("Company slug is required")
+        if not re.match(r"^[a-z0-9-]+$", v):
+            raise ValueError("Slug can only contain lowercase letters, numbers, and hyphens")
+        return v
+
+    @field_validator("logo_url")
+    @classmethod
+    def validate_logo_url(cls, v: str | None) -> str | None:
+        """Validate logo URL."""
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        if not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("Logo URL must start with http:// or https://")
+        return v
+
+
+class OnboardingResponse(BaseModel):
+    """Schema for onboarding completion response."""
+
+    success: bool
+    company: CompanyResponse
+    message: str
