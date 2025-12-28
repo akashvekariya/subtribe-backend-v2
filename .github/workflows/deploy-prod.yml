@@ -221,6 +221,8 @@ jobs:
           COOKIE_SAMESITE: "Lax"
           COOKIE_DOMAIN: "${{ vars.COOKIE_DOMAIN }}"
           COOKIE_MAX_AGE: "2592000"
+          # Super Admin Configuration
+          SUPER_ADMIN_EMAILS: "${{ vars.SUPER_ADMIN_EMAILS }}"
           EOF
 
           # 2. Deploy using the environment variables file
