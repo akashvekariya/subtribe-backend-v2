@@ -8,6 +8,9 @@ pydantic
 pydantic-settings
 email-validator
 
+# AI
+baml-py
+
 # Database & ORM
 sqlalchemy
 asyncpg  # Async PostgreSQL driver with UUID workaround for PgBouncer

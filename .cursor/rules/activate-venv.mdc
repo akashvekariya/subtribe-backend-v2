@@ -1,7 +1,0 @@
----
-alwaysApply: true
----
-
-# Always activate the Python virtual environment (.venv) before running any command.
-# Use: `source .venv/bin/activate` (Linux/macOS) or `.venv\Scripts\activate` (Windows).
-# All shell commands, scripts, and development tasks must be executed with the virtual environment activated to ensure correct dependencies and isolation.

@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY app/ ./app/
+
+# Generate BAML client (must run after app/ is copied)
+RUN baml-cli generate --from app/llm/baml/baml_src --no-tests
 COPY database/ ./database/
 COPY alembic.ini .
 

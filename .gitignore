@@ -226,3 +226,6 @@ __marimo__/
 
 # Archive
 **/docs-archive/
+
+# BAML
+**/baml_client/
