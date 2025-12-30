@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import TIMESTAMP, Boolean, CheckConstraint, ForeignKey, String, text
+from sqlalchemy import TIMESTAMP, Boolean, CheckConstraint, ForeignKey, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,6 +53,15 @@ class User(Base):
         TIMESTAMP(timezone=True), nullable=True
     )
 
+    # Password Reset
+    password_reset_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    password_reset_expires_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    password_reset_requested_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
     # Onboarding State (for org_creator flow)
     # True = user claimed org_creator invite, waiting to complete onboarding
     pending_onboarding: Mapped[bool] = mapped_column(
@@ -77,7 +86,17 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, server_default=text("true"), default=True, nullable=False
     )
+
+    # Security Tracking
     last_login_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    last_login_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    last_password_change: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    failed_login_attempts: Mapped[int] = mapped_column(
+        Integer, server_default=text("0"), default=0, nullable=False
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

@@ -1,4 +1,4 @@
--- RLS Policies for Subtribe ATS
+-- RLS Policies for Subtribe
 -- Run in Supabase SQL Editor after migrations
 -- Safe to run multiple times (idempotent using DROP IF EXISTS)
 

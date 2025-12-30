@@ -1,4 +1,4 @@
-# Subtribe ATS Backend
+# Subtribe Backend
 
 > **Status**: ✅ Production Deployed & Tested (2025-10-12)
 

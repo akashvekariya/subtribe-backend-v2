@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     email_enabled: bool = True
     email_provider: str = "stub"  # "sendgrid" or "stub"
     email_from_address: str = "noreply@thesubtribe.com"
-    email_from_name: str = "Subtribe ATS"
+    email_from_name: str = "Subtribe"
     sendgrid_api_key: str = "dummy-api-key"  # Required even for stub mode
     sendgrid_sandbox_mode: bool = True
     gcp_cloud_tasks_queue: str = "email-queue"

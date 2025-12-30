@@ -146,3 +146,78 @@ class ClaimInviteResponse(BaseModel):
     redirect_to: str  # '/onboarding' or '/'
     message: str | None = None
     access_token: str  # New JWT with updated company_id
+
+
+# =============================================================================
+# Password Reset Schemas
+# =============================================================================
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request to initiate password reset.
+
+    Always returns success message to prevent email enumeration.
+    """
+
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    """Response after requesting password reset."""
+
+    success: bool = True
+    message: str = "If an account exists with this email, a password reset link has been sent."
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request to reset password with valid token."""
+
+    token: str = Field(..., min_length=1, description="Password reset token")
+    password: str = Field(..., min_length=8, description="New password")
+    confirm_password: str = Field(..., min_length=8, description="Confirm new password")
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        """Validate password strength: min 8 chars, uppercase, number, special char."""
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter (A-Z)")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one number (0-9)")
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
+            raise ValueError("Password must contain at least one special character (!@#$%^&*...)")
+        return v
+
+    @field_validator("confirm_password")
+    @classmethod
+    def validate_passwords_match(cls, v: str, info) -> str:
+        """Validate that passwords match."""
+        password = info.data.get("password")
+        if password and v != password:
+            raise ValueError("Passwords do not match")
+        return v
+
+
+class ResetPasswordResponse(BaseModel):
+    """Response after successful password reset."""
+
+    success: bool = True
+    message: str = (
+        "Your password has been reset successfully. Please log in with your new password."
+    )
+
+
+class ValidateResetTokenRequest(BaseModel):
+    """Request to validate a password reset token."""
+
+    token: str = Field(..., min_length=1, description="Password reset token")
+
+
+class ValidateResetTokenResponse(BaseModel):
+    """Response after validating reset token."""
+
+    valid: bool
+    email: str | None = None  # Masked email (e.g., "u***@example.com")
+    message: str | None = None
