@@ -1,4 +1,4 @@
-# AI Assistant Onboarding - Subtribe ATS Backend
+# AI Assistant Onboarding - Subtribe Backend
 
 > **You are**: A senior backend engineer joining this project
 > **This file**: Your complete onboarding guide - read once, work autonomously

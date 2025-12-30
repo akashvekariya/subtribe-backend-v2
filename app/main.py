@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Subtribe ATS",
+    title="Subtribe",
     description="Multi-tenant Applicant Tracking System",
     version="1.0.0",
     debug=settings.debug,

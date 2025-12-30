@@ -1,4 +1,4 @@
-"""API routers for Subtribe ATS."""
+"""API routers for Subtribe."""
 
 from app.routers import auth, companies, jobs
 

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import bcrypt
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from jose import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,15 +24,23 @@ from app.schemas.auth import (
     ClaimInviteRequest,
     ClaimInviteResponse,
     CompanyResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginRequest,
     MeResponse,
     RegisterRequest,
     ResendVerificationRequest,
     ResendVerificationResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     UserResponse,
+    ValidateResetTokenRequest,
+    ValidateResetTokenResponse,
     VerifyEmailRequest,
     VerifyEmailResponse,
 )
+from app.services.notification_service import notification_service
+from app.utils.rate_limiter import password_reset_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -264,12 +272,22 @@ async def register(response: Response, data: RegisterRequest, db: AsyncSession =
 
 
 @router.post("/login", response_model=AuthResponse, tags=["Auth"])
-async def login(response: Response, data: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    response: Response,
+    data: LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """
     Login with email/password.
 
     Returns JWT with user claims. Works for users with or without company.
+    Implements account lockout after 5 failed attempts (15 min lockout).
     """
+    # Security constants
+    max_failed_attempts = 5
+    lockout_duration_minutes = 15
+
     # Find user by email
     stmt = select(User).where(User.email == data.email)
     result = await db.execute(stmt)
@@ -278,7 +296,49 @@ async def login(response: Response, data: LoginRequest, db: AsyncSession = Depen
     if not user:
         raise UnauthorizedError(message="Invalid email or password", code="invalid_credentials")
 
+    # Check if account is locked
+    if user.locked_until and datetime.now(timezone.utc) < user.locked_until:
+        minutes_remaining = int(
+            (user.locked_until - datetime.now(timezone.utc)).total_seconds() / 60
+        )
+        raise UnauthorizedError(
+            message=f"Account is temporarily locked. Try again in {minutes_remaining + 1} minutes.",
+            code="account_locked",
+        )
+
+    # Clear expired lockout
+    if user.locked_until and datetime.now(timezone.utc) >= user.locked_until:
+        user.locked_until = None
+        user.failed_login_attempts = 0
+
     if not verify_password(data.password, user.password_hash):
+        # Increment failed login attempts
+        user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+
+        # Lock account after max_failed_attempts
+        if user.failed_login_attempts >= max_failed_attempts:
+            user.locked_until = datetime.now(timezone.utc) + timedelta(
+                minutes=lockout_duration_minutes
+            )
+            await db.commit()
+            logger.warning(f"Account locked due to failed login attempts: {user.email}")
+
+            # Send security alert email
+            client_ip = request.client.host if request.client else None
+            await notification_service.send_account_locked_alert(
+                user, lockout_minutes=lockout_duration_minutes, ip_address=client_ip
+            )
+
+            raise UnauthorizedError(
+                message=f"Account locked due to too many failed attempts. Try again in {lockout_duration_minutes} minutes.",
+                code="account_locked",
+            )
+
+        await db.commit()
+        remaining_attempts = max_failed_attempts - user.failed_login_attempts
+        logger.info(
+            f"Failed login attempt for {user.email}. {remaining_attempts} attempts remaining."
+        )
         raise UnauthorizedError(message="Invalid email or password", code="invalid_credentials")
 
     if not user.is_active:
@@ -294,8 +354,11 @@ async def login(response: Response, data: LoginRequest, db: AsyncSession = Depen
         if company and not company.is_active:
             raise UnauthorizedError(message="Organization is not active", code="company_inactive")
 
-    # Update last login
+    # Successful login - reset failed attempts and update tracking
+    user.failed_login_attempts = 0
+    user.locked_until = None
     user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_ip = request.client.host if request.client else None
     await db.commit()
 
     # Create JWT
@@ -576,4 +639,228 @@ async def claim_invite(
         redirect_to=redirect_to,
         message=message,
         access_token=access_token,
+    )
+
+
+# =============================================================================
+# Password Reset Endpoints
+# =============================================================================
+
+
+def generate_password_reset_token() -> str:
+    """Generate a secure password reset token (256-bit entropy)."""
+    return secrets.token_urlsafe(32)
+
+
+def mask_email(email: str) -> str:
+    """Mask an email address for privacy.
+
+    Example: user@example.com -> u***@example.com
+    """
+    parts = email.split("@")
+    if len(parts) != 2:
+        return "***@***"
+
+    local = parts[0]
+    domain = parts[1]
+
+    masked_local = "*" if len(local) <= 1 else local[0] + "***"
+
+    return f"{masked_local}@{domain}"
+
+
+async def send_password_reset_email(user: User, token: str) -> bool:
+    """Send password reset email to user."""
+    reset_url = f"{settings.dashboard_url}/reset-password/{token}"
+
+    message = EmailMessage(
+        to_email=user.email,
+        to_name=f"{user.first_name} {user.last_name}",
+        subject="Reset Your Subtribe Password",
+        body=f"""Hi {user.first_name},
+
+We received a request to reset your password for your Subtribe account.
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you didn't request this, you can safely ignore this email.
+
+- Team Subtribe
+""",
+        from_email=settings.email_from_address,
+        from_name=settings.email_from_name,
+    )
+
+    provider = _get_email_provider()
+    result = await provider.send_email(message)
+
+    if result.success:
+        logger.info(f"Password reset email sent to {user.email}")
+    else:
+        logger.error(f"Failed to send password reset email to {user.email}: {result.error_message}")
+
+    return result.success
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse, tags=["Auth"])
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Request a password reset email.
+
+    Always returns success to prevent email enumeration.
+    Rate limited to 3 requests per email per hour.
+    """
+    # Check rate limit
+    email_lower = data.email.lower()
+    if not password_reset_limiter.is_allowed(email_lower):
+        # Still return success to prevent enumeration
+        logger.warning(f"Rate limit exceeded for password reset: {email_lower}")
+        return ForgotPasswordResponse()
+
+    # Record the request regardless of whether email exists
+    password_reset_limiter.record(email_lower)
+
+    # Find user by email
+    stmt = select(User).where(User.email == data.email)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # Don't reveal if email exists - return success
+        logger.info(f"Password reset requested for non-existent email: {data.email}")
+        return ForgotPasswordResponse()
+
+    if not user.is_active:
+        # Don't reveal account status - return success
+        logger.info(f"Password reset requested for inactive account: {data.email}")
+        return ForgotPasswordResponse()
+
+    # Generate reset token
+    reset_token = generate_password_reset_token()
+    user.password_reset_token = reset_token
+    user.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    user.password_reset_requested_at = datetime.now(timezone.utc)
+
+    await db.commit()
+
+    # Send email
+    await send_password_reset_email(user, reset_token)
+
+    return ForgotPasswordResponse()
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse, tags=["Auth"])
+async def reset_password(
+    data: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Reset password using a valid reset token.
+
+    Token must be valid and not expired.
+    Password must meet strength requirements (8+ chars, uppercase, number, special char).
+    Clears reset token after successful reset.
+    """
+    # Find user by reset token
+    stmt = select(User).where(User.password_reset_token == data.token)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise ValidationError(
+            message="Invalid or expired password reset token",
+            code="invalid_reset_token",
+        )
+
+    # Check if token expired
+    if (
+        user.password_reset_expires_at
+        and datetime.now(timezone.utc) > user.password_reset_expires_at
+    ):
+        # Clear expired token
+        user.password_reset_token = None
+        user.password_reset_expires_at = None
+        await db.commit()
+
+        raise ValidationError(
+            message="Password reset token has expired. Please request a new one.",
+            code="token_expired",
+        )
+
+    # Check if account is active
+    if not user.is_active:
+        raise ValidationError(
+            message="Account is inactive",
+            code="account_inactive",
+        )
+
+    # Update password
+    user.password_hash = hash_password(data.password)
+    user.password_reset_token = None
+    user.password_reset_expires_at = None
+    user.password_reset_requested_at = None
+    user.last_password_change = datetime.now(timezone.utc)
+
+    # Reset failed login attempts if any
+    user.failed_login_attempts = 0
+    user.locked_until = None
+
+    await db.commit()
+
+    logger.info(f"Password reset successful for user {user.email}")
+
+    # Send password reset success notification
+    await notification_service.send_password_reset_success(user)
+
+    return ResetPasswordResponse()
+
+
+@router.post("/validate-reset-token", response_model=ValidateResetTokenResponse, tags=["Auth"])
+async def validate_reset_token(
+    data: ValidateResetTokenRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Validate a password reset token.
+
+    Returns whether the token is valid and a masked email.
+    Used by frontend to show appropriate UI before user enters new password.
+    """
+    # Find user by reset token
+    stmt = select(User).where(User.password_reset_token == data.token)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return ValidateResetTokenResponse(
+            valid=False,
+            message="Invalid or expired password reset token",
+        )
+
+    # Check if token expired
+    if (
+        user.password_reset_expires_at
+        and datetime.now(timezone.utc) > user.password_reset_expires_at
+    ):
+        return ValidateResetTokenResponse(
+            valid=False,
+            message="Password reset token has expired. Please request a new one.",
+        )
+
+    # Check if account is active
+    if not user.is_active:
+        return ValidateResetTokenResponse(
+            valid=False,
+            message="Account is inactive",
+        )
+
+    return ValidateResetTokenResponse(
+        valid=True,
+        email=mask_email(user.email),
     )
