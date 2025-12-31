@@ -202,6 +202,8 @@ jobs:
           COOKIE_MAX_AGE: "2592000"
           # Super Admin Configuration
           SUPER_ADMIN_EMAILS: "${{ vars.SUPER_ADMIN_EMAILS }}"
+          # Google API Key (for Gemini/AI services)
+          GOOGLE_API_KEY: "${{ secrets.GOOGLE_API_KEY }}"
           EOF
           
           # 2. Deploy using the environment variables file
