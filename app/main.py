@@ -10,9 +10,29 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.exceptions import register_exception_handlers
 from app.logging import LoggingMiddleware, setup_logging
-from app.routers import applications, auth, companies, dashboard, emails, invites, jobs
+from app.routers import ai, applications, auth, companies, dashboard, emails, invites, jobs
 
 logger = logging.getLogger(__name__)
+
+
+def _configure_subtribe_ai():
+    """Configure the subtribe-ai package with settings from backend config."""
+    try:
+        import subtribe_ai
+
+        subtribe_ai.configure(
+            google_api_key=settings.subtribe_ai_google_api_key,
+            openai_api_key=settings.subtribe_ai_openai_api_key,
+            default_model=settings.subtribe_ai_default_model,
+            langfuse_enabled=settings.subtribe_ai_langfuse_enabled,
+            langfuse_public_key=settings.subtribe_ai_langfuse_public_key,
+            langfuse_secret_key=settings.subtribe_ai_langfuse_secret_key,
+        )
+        logger.info("subtribe-ai configured successfully")
+    except ImportError:
+        logger.warning("subtribe-ai not installed, AI features will be unavailable")
+    except Exception as e:
+        logger.error(f"Failed to configure subtribe-ai: {e}")
 
 
 @asynccontextmanager
@@ -30,6 +50,9 @@ async def lifespan(app: FastAPI):
         log_level=settings.log_level,
         third_party_log_level=settings.third_party_log_level,
     )
+
+    # Configure subtribe-ai package
+    _configure_subtribe_ai()
 
     logger.info(
         "Application starting",
@@ -132,3 +155,4 @@ app.include_router(applications.router, prefix="/applications")
 app.include_router(emails.internal_router, prefix="/internal/emails")
 app.include_router(emails.email_router, prefix="/emails")
 app.include_router(emails.router, prefix="/emails")
+app.include_router(ai.router, prefix="/api/ai")

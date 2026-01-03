@@ -74,6 +74,15 @@ class Settings(BaseSettings):
     log_response_body: bool = True  # Log response bodies (can override per route)
     third_party_log_level: str = "WARNING"  # Log level for ALL third-party libraries
 
+    # AI Configuration (subtribe-ai package)
+    # These env vars use SUBTRIBE_AI_ prefix and are loaded by the subtribe-ai package
+    subtribe_ai_google_api_key: str = ""
+    subtribe_ai_openai_api_key: str = ""
+    subtribe_ai_default_model: str = "gemini-2.0-flash"
+    subtribe_ai_langfuse_enabled: bool = False
+    subtribe_ai_langfuse_public_key: str = ""
+    subtribe_ai_langfuse_secret_key: str = ""
+
     model_config = SettingsConfigDict(
         env_file=f".env.{os.getenv('ENVIRONMENT', 'development')}",
         env_file_encoding="utf-8",

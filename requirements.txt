@@ -31,6 +31,9 @@ pytz>=2023.3
 # HTTP Client
 httpx
 
+# AI Package (local dependency)
+-e ../subtribe-ai
+
 # Logging
 python-json-logger==2.0.7
 
