@@ -6,7 +6,17 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import TIMESTAMP, CheckConstraint, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import (
+    TIMESTAMP,
+    CheckConstraint,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -68,6 +78,20 @@ class Application(Base):
         JSONB, server_default=text("'{}'::jsonb"), default=dict, nullable=False
     )
 
+    # AI Evaluation Results (from Pipeline C: Candidate Evaluation)
+    evaluation_json: Mapped[dict | None] = mapped_column(
+        JSONB, nullable=True
+    )  # Full evaluation result: scores, analysis, skill_matches, dimension_assessments, etc.
+    evaluation_score: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )  # Final score (0-10 scale)
+    evaluation_tier: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )  # Tier: strong_match, good_match, moderate_match, weak_match, mismatch (+ _blocked/_flagged suffix)
+    evaluated_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )  # Timestamp when AI evaluation was completed
+
     # Pipeline Status
     status: Mapped[str] = mapped_column(
         String(100), server_default=text("'applied'"), default="applied", nullable=False
@@ -121,6 +145,8 @@ class Application(Base):
         Index("idx_applications_job_applied", "job_id", "applied_at"),
         # Composite index for status filtering (common recruiter workflow)
         Index("idx_applications_job_status_applied", "job_id", "status", "applied_at"),
+        # Index for evaluation queries (sorting by score within a job)
+        Index("idx_applications_job_eval_score", "job_id", "evaluation_score"),
     )
 
     def __repr__(self) -> str:
