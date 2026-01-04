@@ -20,9 +20,11 @@ from app.schemas.application import (
 )
 from app.schemas.common import PaginationMeta
 from app.schemas.job import (
+    CalibrationSaveRequest,
     JobActivityStats,
     JobApplicationsByStatus,
     JobApplicationStats,
+    JobCalibrationResponse,
     JobCreate,
     JobListItem,
     JobListResponse,
@@ -203,6 +205,7 @@ async def list_jobs(
             "creator": job.creator,
             "published_at": job.published_at,
             "created_at": job.created_at,
+            "calibrated_at": job.calibrated_at,
         }
         jobs_with_counts.append(JobListItem(**job_dict))
 
@@ -467,6 +470,73 @@ async def get_job_stats(
             avg_time_to_hire_days=None,  # TODO: Implement in future iteration
         ),
         generated_at=now,
+    )
+
+
+@router.put("/{job_id}/calibration", response_model=JobCalibrationResponse, tags=["Jobs"])
+async def save_job_calibration(
+    job_id: UUID,
+    calibration_data: CalibrationSaveRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Save calibration results for a job.
+
+    - Multi-tenant: Can only save calibration for jobs from user's company
+    - Stores calibration_summary, evaluation_framework, and sets calibrated_at
+    """
+    # Fetch job
+    stmt = select(Job).where(Job.id == job_id, Job.company_id == current_user["company_id"])
+    result = await db.execute(stmt)
+    job = result.scalar_one_or_none()
+
+    if not job:
+        raise NotFoundError(message="Job not found", code="job_not_found")
+
+    # Update calibration fields
+    job.calibration_summary = calibration_data.calibration_summary
+    job.evaluation_framework = calibration_data.evaluation_framework
+    job.calibrated_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(job)
+
+    return JobCalibrationResponse(
+        id=job.id,
+        calibration_summary=job.calibration_summary,
+        evaluation_framework=job.evaluation_framework,
+        calibrated_at=job.calibrated_at,
+        message="Calibration saved successfully",
+    )
+
+
+@router.get("/{job_id}/calibration", response_model=JobCalibrationResponse, tags=["Jobs"])
+async def get_job_calibration(
+    job_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get calibration results for a job.
+
+    - Multi-tenant: Can only get calibration for jobs from user's company
+    - Returns calibration_summary, evaluation_framework, and calibrated_at
+    """
+    # Fetch job
+    stmt = select(Job).where(Job.id == job_id, Job.company_id == current_user["company_id"])
+    result = await db.execute(stmt)
+    job = result.scalar_one_or_none()
+
+    if not job:
+        raise NotFoundError(message="Job not found", code="job_not_found")
+
+    return JobCalibrationResponse(
+        id=job.id,
+        calibration_summary=job.calibration_summary,
+        evaluation_framework=job.evaluation_framework,
+        calibrated_at=job.calibrated_at,
+        message="Calibration retrieved successfully" if job.calibrated_at else "Job not calibrated yet",
     )
 
 

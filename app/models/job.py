@@ -87,6 +87,17 @@ class Job(Base):
         Integer, server_default=text("0"), default=0, nullable=False
     )
 
+    # AI Calibration
+    calibration_summary: Mapped[dict | None] = mapped_column(
+        JSONB, nullable=True, comment="Calibration decisions made by recruiter"
+    )
+    evaluation_framework: Mapped[dict | None] = mapped_column(
+        JSONB, nullable=True, comment="AI-generated evaluation framework for scoring candidates"
+    )
+    calibrated_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True, comment="When calibration was completed"
+    )
+
     # Timestamps
     published_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
