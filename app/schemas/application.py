@@ -157,6 +157,9 @@ class ApplicationListItem(BaseModel):
     linkedin_url: str | None
     status: str
     applied_at: datetime
+    # AI Evaluation fields
+    evaluation_score: float | None = None
+    evaluation_tier: str | None = None
 
 
 class JobBasic(BaseModel):
