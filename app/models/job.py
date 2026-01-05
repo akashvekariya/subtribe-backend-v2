@@ -13,6 +13,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 if TYPE_CHECKING:
+    from app.models.ai_resume_eval_batch import AIResumeEvalBatch
     from app.models.application import Application
     from app.models.company import Company
     from app.models.user import User
@@ -123,6 +124,9 @@ class Job(Base):
     )
     applications: Mapped[list[Application]] = relationship(
         "Application", back_populates="job", cascade="all, delete-orphan"
+    )
+    ai_resume_eval_batches: Mapped[list[AIResumeEvalBatch]] = relationship(
+        "AIResumeEvalBatch", back_populates="job", cascade="all, delete-orphan"
     )
 
     # Constraints & Indexes

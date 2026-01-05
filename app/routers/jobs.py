@@ -36,6 +36,7 @@ from app.schemas.job import (
     JobViewStats,
     PublicJobResponse,
 )
+from app.services.evaluation import trigger_evaluation_for_job
 
 router = APIRouter()
 public_router = APIRouter()
@@ -502,12 +503,23 @@ async def save_job_calibration(
     await db.commit()
     await db.refresh(job)
 
+    # Auto-trigger evaluation for existing unevaluated applications
+    triggered_count = await trigger_evaluation_for_job(
+        db=db,
+        job_id=job_id,
+        triggered_by=UUID(current_user["user_id"]),
+    )
+
+    message = "Calibration saved successfully"
+    if triggered_count > 0:
+        message += f". Started evaluation for {triggered_count} applications."
+
     return JobCalibrationResponse(
         id=job.id,
         calibration_summary=job.calibration_summary,
         evaluation_framework=job.evaluation_framework,
         calibrated_at=job.calibrated_at,
-        message="Calibration saved successfully",
+        message=message,
     )
 
 

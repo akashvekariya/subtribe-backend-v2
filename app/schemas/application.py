@@ -202,6 +202,14 @@ class ApplicationDetail(BaseModel):
     # Status
     status: str
 
+    # AI Resume Evaluation fields
+    ai_resume_eval_status: str | None = None
+    ai_resume_eval_batch_id: UUID | None = None
+    evaluation_json: dict | None = None
+    evaluation_score: float | None = None
+    evaluation_tier: str | None = None
+    evaluated_at: datetime | None = None
+
     # Metadata
     source: str | None
     applied_at: datetime

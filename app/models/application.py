@@ -92,6 +92,14 @@ class Application(Base):
         TIMESTAMP(timezone=True), nullable=True
     )  # Timestamp when AI evaluation was completed
 
+    # AI Resume Evaluation Batch Tracking
+    ai_resume_eval_status: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )  # pending, processing, completed, failed, skipped
+    ai_resume_eval_batch_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ai_resume_eval_batches.id", ondelete="SET NULL"), nullable=True
+    )  # Reference to the batch this application was evaluated in
+
     # Pipeline Status
     status: Mapped[str] = mapped_column(
         String(100), server_default=text("'applied'"), default="applied", nullable=False

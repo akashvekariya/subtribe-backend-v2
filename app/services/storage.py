@@ -326,6 +326,76 @@ class StorageService:
         """
         return self.generate_signed_url(gcs_uri, expiration_minutes=60, disposition="attachment")
 
+    def download_file(self, gcs_uri: str) -> bytes:
+        """
+        Download file contents from GCS.
+
+        Args:
+            gcs_uri: GCS URI (gs://bucket/path/to/file.pdf)
+
+        Returns:
+            File contents as bytes
+
+        Raises:
+            GoogleCloudError: If download fails
+        """
+        start_time = time.time()
+        try:
+            # Parse bucket and path from GCS URI
+            # Format: gs://bucket-name/path/to/file.pdf
+            if not gcs_uri.startswith("gs://"):
+                raise ValueError(f"Invalid GCS URI format: {gcs_uri}")
+
+            uri_without_prefix = gcs_uri[5:]  # Remove "gs://"
+            parts = uri_without_prefix.split("/", 1)
+            if len(parts) != 2:
+                raise ValueError(f"Invalid GCS URI format: {gcs_uri}")
+
+            bucket_name = parts[0]
+            path = parts[1]
+
+            # Get the bucket (may be different from default)
+            bucket = self.client.bucket(bucket_name)
+            blob = bucket.blob(path)
+
+            # Download to bytes
+            contents = blob.download_as_bytes(timeout=60)
+
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            logger.info(
+                "Downloaded file from GCS",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "download_file",
+                    "duration_ms": duration_ms,
+                    "success": True,
+                    "gcs_uri": gcs_uri,
+                    "size_bytes": len(contents),
+                },
+            )
+            return contents
+
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            logger.error(
+                "Failed to download file from GCS",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "download_file",
+                    "duration_ms": duration_ms,
+                    "success": False,
+                    "gcs_uri": gcs_uri,
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
+            raise GoogleCloudError(f"Failed to download file: {str(e)}") from e
+
 
 # Singleton instance
 storage_service = StorageService()

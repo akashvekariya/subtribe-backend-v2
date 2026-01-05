@@ -10,7 +10,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.exceptions import register_exception_handlers
 from app.logging import LoggingMiddleware, setup_logging
-from app.routers import ai, applications, auth, companies, dashboard, emails, invites, jobs
+from app.routers import (
+    ai,
+    ai_resume_eval,
+    applications,
+    auth,
+    companies,
+    dashboard,
+    emails,
+    invites,
+    jobs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -156,3 +166,4 @@ app.include_router(emails.internal_router, prefix="/internal/emails")
 app.include_router(emails.email_router, prefix="/emails")
 app.include_router(emails.router, prefix="/emails")
 app.include_router(ai.router, prefix="/api/ai")
+app.include_router(ai_resume_eval.router, prefix="/api")
