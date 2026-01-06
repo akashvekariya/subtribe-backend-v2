@@ -46,11 +46,13 @@ def _get_queue_path() -> str:
     """Get the full queue path."""
     from app.config import settings
 
-    project = settings.gcp_project_id
-    location = CLOUD_TASKS_CONFIG.location
+    project = settings.gcs_project_id
+    location = settings.gcp_cloud_tasks_location
     queue = CLOUD_TASKS_CONFIG.queue_name
 
-    return f"projects/{project}/locations/{location}/queues/{queue}"
+    path = f"projects/{project}/locations/{location}/queues/{queue}"
+    logger.info(f"Cloud Tasks queue path: {path}")
+    return path
 
 
 class CloudTasksManager:
@@ -63,8 +65,13 @@ class CloudTasksManager:
 
     def __init__(self):
         self.client = _get_tasks_client()
-        self.service_url = CLOUD_TASKS_CONFIG.service_url
         self.task_deadline = CLOUD_TASKS_CONFIG.task_deadline_seconds
+
+    @property
+    def service_url(self) -> str:
+        """Get service URL from settings (loaded at runtime)."""
+        from app.config import settings
+        return settings.ai_resume_eval_service_url
 
     @property
     def is_available(self) -> bool:
@@ -97,7 +104,8 @@ class CloudTasksManager:
             queue_path = _get_queue_path()
 
             # Build the request URL
-            url = f"{self.service_url}/internal/ai-resume-eval/process/{task_id}"
+            url = f"{self.service_url}/api/ai-resume-eval/internal/process/{task_id}"
+            logger.info(f"Cloud Tasks callback URL: {url}")
 
             # Create task payload
             task = {

@@ -5,6 +5,7 @@ Handles individual task execution - parsing resumes and
 evaluating candidates against job frameworks.
 """
 
+import asyncio
 import logging
 import time
 from datetime import datetime, timezone
@@ -159,6 +160,9 @@ class AIResumeEvalWorker:
         """
         Execute the AI evaluation pipeline.
 
+        Uses asyncio.to_thread() for blocking operations to avoid
+        blocking the event loop and preventing other requests.
+
         Args:
             application: The application to evaluate
             job: The job with evaluation framework
@@ -181,21 +185,23 @@ class AIResumeEvalWorker:
 
             logger.info(f"Downloading and parsing resume for application {application.id}")
 
-            # Download PDF from GCS
-            pdf_bytes = storage_service.download_file(application.resume_url)
+            # Download PDF from GCS (run in thread pool to avoid blocking)
+            pdf_bytes = await asyncio.to_thread(
+                storage_service.download_file, application.resume_url
+            )
 
-            # Extract text for evaluation
-            resume_text = _extract_text_from_pdf(pdf_bytes)
+            # Extract text for evaluation (run in thread pool to avoid blocking)
+            resume_text = await asyncio.to_thread(_extract_text_from_pdf, pdf_bytes)
             if not resume_text or not resume_text.strip():
                 raise ValueError("Could not extract text from resume PDF")
 
             # Store parsed text for future use
             application.resume_parsed_text = resume_text
 
-            # Parse PDF for structured JSON if not already done
+            # Parse PDF for structured JSON if not already done (run in thread pool)
             if not application.resume_parsed_json:
                 logger.info(f"Parsing resume structure for application {application.id}")
-                parse_result = parse_resume(pdf_bytes)
+                parse_result = await asyncio.to_thread(parse_resume, pdf_bytes)
                 application.resume_parsed_json = parse_result
 
             await self.db.flush()
@@ -203,14 +209,19 @@ class AIResumeEvalWorker:
         # Parse resume text if we have text but no structured JSON
         elif not application.resume_parsed_json and application.resume_url:
             logger.info(f"Parsing resume structure for application {application.id}")
-            pdf_bytes = storage_service.download_file(application.resume_url)
-            parse_result = parse_resume(pdf_bytes)
+            # Download in thread pool
+            pdf_bytes = await asyncio.to_thread(
+                storage_service.download_file, application.resume_url
+            )
+            # Parse in thread pool
+            parse_result = await asyncio.to_thread(parse_resume, pdf_bytes)
             application.resume_parsed_json = parse_result
             await self.db.flush()
 
-        # Evaluate candidate against framework
+        # Evaluate candidate against framework (run in thread pool to avoid blocking)
         logger.info(f"Evaluating application {application.id} against framework")
-        evaluation_result = evaluate_candidate(
+        evaluation_result = await asyncio.to_thread(
+            evaluate_candidate,
             resume_text=resume_text,
             framework=job.evaluation_framework,
         )

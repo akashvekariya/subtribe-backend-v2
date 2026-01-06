@@ -383,7 +383,7 @@ class AIResumeEvalService:
             select(AIResumeEvalTask)
             .where(
                 AIResumeEvalTask.batch_id == batch_id,
-                AIResumeEvalTask.status.in_(["failed", "skipped"]),
+                AIResumeEvalTask.status.in_(["failed", "skipped", "queued", "pending"]),
             )
         )
         result = await self.db.execute(stmt)

@@ -30,6 +30,7 @@ from app.schemas.application import (
     StatusHistoryResponse,
     UserBasic,
 )
+from app.services.evaluation.auto_trigger import trigger_evaluation_for_application
 from app.services.storage import storage_service
 
 router = APIRouter()  # Protected endpoints
@@ -221,6 +222,24 @@ async def submit_application(
             "last_name": last_name,
         },
     )
+
+    # Auto-trigger evaluation if job is calibrated
+    try:
+        triggered = await trigger_evaluation_for_application(db, application.id)
+        if triggered:
+            logger.info(
+                "Auto-triggered evaluation for new application",
+                extra={
+                    "application_id": str(application.id),
+                    "job_id": job_id_str,
+                },
+            )
+    except Exception as e:
+        # Don't fail the application submission if auto-trigger fails
+        logger.warning(
+            f"Failed to auto-trigger evaluation: {e}",
+            extra={"application_id": str(application.id)},
+        )
 
     return ApplicationSubmitted(id=application.id)
 

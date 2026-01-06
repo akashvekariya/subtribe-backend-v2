@@ -14,8 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.application import Application
 from app.models.job import Job
-from app.services.evaluation.service import AIResumeEvalService
 from app.services.evaluation.cloud_tasks import queue_evaluation_tasks
+from app.services.evaluation.service import AIResumeEvalService
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +54,9 @@ async def trigger_evaluation_for_application(
             logger.debug(f"Job {application.job_id} not calibrated, skipping auto-evaluation")
             return False
 
-        # Check if application has parsed resume (required for evaluation)
-        if not application.resume_parsed_json:
-            logger.debug(f"Application {application_id} has no parsed resume, skipping auto-evaluation")
+        # Check if application has resume URL (worker will download and parse)
+        if not application.resume_url:
+            logger.debug(f"Application {application_id} has no resume, skipping auto-evaluation")
             return False
 
         # Create evaluation batch and task
@@ -123,12 +123,12 @@ async def trigger_evaluation_for_job(
             logger.warning(f"Job {job_id} not calibrated")
             return 0
 
-        # Get unevaluated applications with parsed resumes
+        # Get unevaluated applications with resumes (worker will parse)
         stmt = select(Application).where(
             Application.job_id == job_id,
             Application.deleted_at.is_(None),
             Application.ai_resume_eval_status.is_(None),
-            Application.resume_parsed_json.isnot(None),
+            Application.resume_url.isnot(None),
         ).limit(max_applications)
 
         result = await db.execute(stmt)

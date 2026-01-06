@@ -139,7 +139,7 @@ class CloudTasksConfig:
     queue_name: str = os.getenv("AI_RESUME_EVAL_TASK_QUEUE_NAME", "ai-resume-eval-tasks")
 
     # GCP location/region
-    location: str = os.getenv("AI_RESUME_EVAL_TASK_LOCATION", "asia-south1")
+    location: str = os.getenv("AI_RESUME_EVAL_TASK_LOCATION", "asia-east1")
 
     # Task execution deadline (seconds)
     task_deadline_seconds: int = int(os.getenv("AI_RESUME_EVAL_TASK_DEADLINE", "300"))

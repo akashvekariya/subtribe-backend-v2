@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     log_response_body: bool = True  # Log response bodies (can override per route)
     third_party_log_level: str = "WARNING"  # Log level for ALL third-party libraries
 
+    # AI Resume Evaluation
+    ai_resume_eval_service_url: str = "http://localhost:8000"
+
     # AI Configuration (subtribe-ai package)
     # These env vars use SUBTRIBE_AI_ prefix and are loaded by the subtribe-ai package
     subtribe_ai_google_api_key: str = ""
