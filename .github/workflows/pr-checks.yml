@@ -31,41 +31,38 @@ jobs:
           python-version: "3.13"
           cache: "pip"
 
-      # Step 3: Configure git credentials for private subtribe-ai repo
-      - name: Configure git credentials
-        run: |
-          git config --global url."https://${{ secrets.SUBTRIBE_AI_TOKEN }}@github.com/".insteadOf "https://github.com/"
-        env:
-          SUBTRIBE_AI_TOKEN: ${{ secrets.SUBTRIBE_AI_TOKEN }}
-
-      # Step 4: Install dependencies
+      # Step 3: Install dependencies with token authentication
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # Create temporary requirements file with authenticated URL
+          sed "s|git+https://github.com/thesubtribe/subtribe-ai.git@main|git+https://${{ secrets.SUBTRIBE_AI_TOKEN }}@github.com/thesubtribe/subtribe-ai.git@main|g" requirements.txt > requirements-ci.txt
+          pip install -r requirements-ci.txt
+        env:
+          SUBTRIBE_AI_TOKEN: ${{ secrets.SUBTRIBE_AI_TOKEN }}
 
-      # Step 5: Run Ruff linter (check for errors)
+      # Step 4: Run Ruff linter (check for errors)
       - name: Lint with Ruff
         run: |
           echo "🔍 Running Ruff linter..."
           ruff check . --output-format=github
         continue-on-error: false
 
-      # Step 6: Run Ruff formatter check (ensure code is formatted)
+      # Step 5: Run Ruff formatter check (ensure code is formatted)
       - name: Check code formatting
         run: |
           echo "✨ Checking code formatting with Ruff..."
           ruff format --check .
         continue-on-error: false
 
-      # Step 7: Run mypy type checking
+      # Step 6: Run mypy type checking
       - name: Type check with mypy
         run: |
           echo "🔎 Running mypy type checker..."
           mypy app --ignore-missing-imports --check-untyped-defs
         continue-on-error: true  # Don't fail build on type errors (warning only)
 
-      # Step 8: Run unit tests (schemas & services only - no DB needed)
+      # Step 7: Run unit tests (schemas & services only - no DB needed)
       - name: Run unit tests
         env:
           DATABASE_URL: "postgresql+asyncpg://test:test@localhost:5432/test"
@@ -91,7 +88,7 @@ jobs:
           pytest tests/unit/test_schemas.py tests/unit/test_services.py -v --tb=short
         continue-on-error: false
 
-      # Step 9: Summary
+      # Step 8: Summary
       - name: Summary
         if: success()
         run: |
