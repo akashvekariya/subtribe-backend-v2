@@ -16,14 +16,27 @@ ENV GITHUB_TOKEN=${GITHUB_TOKEN}
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
+
+# Install base requirements (without subtribe-ai)
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install subtribe-ai with baml_client generation
 RUN set -e && \
     if [ -z "$GITHUB_TOKEN" ]; then \
         echo "ERROR: GITHUB_TOKEN not provided. Cannot install private subtribe-ai package." && \
         exit 1; \
     fi && \
-    git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/" && \
-    pip install --no-cache-dir -r requirements.txt && \
-    git config --global --unset-all url."https://${GITHUB_TOKEN}@github.com/".insteadOf || true && \
+    echo "Installing baml-py to get baml-cli..." && \
+    pip install --no-cache-dir baml-py==0.216.0 && \
+    echo "Cloning subtribe-ai repository..." && \
+    git clone https://${GITHUB_TOKEN}@github.com/thesubtribe/subtribe-ai.git /tmp/subtribe-ai && \
+    cd /tmp/subtribe-ai && \
+    echo "Generating BAML client..." && \
+    baml-cli generate --from src/subtribe_ai/baml_src && \
+    echo "Installing subtribe-ai package..." && \
+    pip install --no-cache-dir . && \
+    cd / && \
+    rm -rf /tmp/subtribe-ai && \
     unset GITHUB_TOKEN
 
 # Copy application code
