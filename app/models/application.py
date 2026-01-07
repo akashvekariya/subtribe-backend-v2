@@ -68,7 +68,9 @@ class Application(Base):
         String(3000), nullable=False
     )  # GCS path: gs://bucket/{company_id}/{job_id}/{app_id}_resume.pdf
     resume_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    resume_parsed_text: Mapped[str | None] = mapped_column(Text, nullable=True)  # Raw OCR text
+    resume_parsed_md: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  # Gemini-extracted markdown from PDF
     resume_parsed_json: Mapped[dict | None] = mapped_column(
         JSONB, nullable=True
     )  # Structured data (skills, experience, education)

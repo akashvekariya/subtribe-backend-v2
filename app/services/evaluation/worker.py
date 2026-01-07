@@ -114,7 +114,7 @@ class AIResumeEvalWorker:
             return {"success": False, "error": "Job not calibrated"}
 
         # Check if resume is available
-        if not application.resume_parsed_text and not application.resume_url:
+        if not application.resume_parsed_md and not application.resume_url:
             await self._mark_task_skipped(task, "No resume available")
             return {"success": True, "skipped": True, "reason": "No resume"}
 
@@ -170,51 +170,117 @@ class AIResumeEvalWorker:
         """
         # Import subtribe_ai functions
         try:
-            from subtribe_ai import evaluate_candidate, parse_resume
+            from subtribe_ai import evaluate_candidate
         except ImportError as e:
             logger.error(f"Failed to import subtribe_ai: {e}")
             raise RuntimeError("subtribe_ai not available") from e
 
-        # Get resume text - download and parse if not available
-        resume_text = application.resume_parsed_text
+        # Get or parse resume - we need both markdown and structured JSON
+        resume_text = application.resume_parsed_md
+        links_json_cached = None  # Will store links for Step 2
+
+        # Step 1: Extract markdown from PDF if not already done
         if not resume_text:
             if not application.resume_url:
                 raise ValueError("No resume available for evaluation")
 
-            logger.info(f"Downloading and parsing resume for application {application.id}")
+            logger.info(f"Step 1: Downloading and extracting markdown from PDF for application {application.id}")
 
             # Download PDF from GCS (run in thread pool to avoid blocking)
             pdf_bytes = await asyncio.to_thread(
                 storage_service.download_file, application.resume_url
             )
 
-            # Extract text for evaluation (run in thread pool to avoid blocking)
-            resume_text = await asyncio.to_thread(_extract_text_from_pdf, pdf_bytes)
-            if not resume_text or not resume_text.strip():
-                raise ValueError("Could not extract text from resume PDF")
+            try:
+                # Import BAML client for direct step-by-step parsing
+                import tempfile
+                from pathlib import Path
 
-            # Store parsed text for future use
-            application.resume_parsed_text = resume_text
+                import baml_py
+                from subtribe_ai.baml_client import b
+                from subtribe_ai.utils import (
+                    extract_links,
+                    links_to_prompt_text,
+                    pdf_to_base64,
+                    preprocess_links,
+                )
 
-            # Parse PDF for structured JSON if not already done (run in thread pool)
-            if not application.resume_parsed_json:
-                logger.info(f"Parsing resume structure for application {application.id}")
-                parse_result = await asyncio.to_thread(parse_resume, pdf_bytes)
+                # Write bytes to temp file for link extraction
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+                    f.write(pdf_bytes)
+                    temp_path = Path(f.name)
+
+                try:
+                    # Extract links and convert to base64 (run in thread pool)
+                    links = await asyncio.to_thread(extract_links, temp_path, 2.5)
+                    pdf_base64 = await asyncio.to_thread(pdf_to_base64, temp_path)
+                    resume_pdf = baml_py.Pdf.from_base64(pdf_base64)
+                    preprocessed = preprocess_links(links)
+                    links_json_cached = links_to_prompt_text(preprocessed)
+
+                    # Step 1: Extract PDF to markdown (run in thread pool)
+                    resume_text = await asyncio.to_thread(
+                        b.ExtractResumeToMarkdown,
+                        resume=resume_pdf,
+                        links_json=links_json_cached,
+                    )
+                finally:
+                    temp_path.unlink()
+
+                if not resume_text or not resume_text.strip():
+                    # Fallback to PyMuPDF extraction if Gemini markdown is empty
+                    resume_text = await asyncio.to_thread(_extract_text_from_pdf, pdf_bytes)
+                    if not resume_text or not resume_text.strip():
+                        raise ValueError("Could not extract text from resume PDF")
+
+                # Store markdown immediately (non-blocking) - CHECKPOINT 1
+                application.resume_parsed_md = resume_text
+                await self.db.flush()
+                logger.info(f"✓ Step 1 complete: Stored markdown for application {application.id}")
+
+            except Exception as e:
+                logger.error(f"Step 1 failed to extract markdown: {e}")
+                # Fallback to PyMuPDF
+                resume_text = await asyncio.to_thread(_extract_text_from_pdf, pdf_bytes)
+                if not resume_text or not resume_text.strip():
+                    raise ValueError("Could not extract text from resume PDF") from e
+                application.resume_parsed_md = resume_text
+                await self.db.flush()
+
+        # Step 2: Parse markdown to structured JSON if not already done
+        if not application.resume_parsed_json and resume_text:
+            logger.info(f"Step 2: Parsing markdown to JSON for application {application.id}")
+            try:
+                # Import BAML client and utils
+                from subtribe_ai.baml_client import b
+                from subtribe_ai.processing.resume_processor import (
+                    process_resume as run_post_processing,
+                )
+
+                # Use cached links if available, otherwise empty string (links are in markdown)
+                links_text = links_json_cached if links_json_cached else ""
+
+                # Parse markdown to structured JSON (run in thread pool)
+                baml_response = await asyncio.to_thread(
+                    b.ParseResume,
+                    resume_markdown=resume_text,
+                    extracted_links_text=links_text,
+                )
+
+                # Run post-processing (run in thread pool)
+                parse_result = await asyncio.to_thread(run_post_processing, baml_response)
+                parse_result["markdown"] = resume_text  # Include markdown in result
+
+                # Store structured JSON immediately (non-blocking) - CHECKPOINT 2
                 application.resume_parsed_json = parse_result
+                await self.db.flush()
+                logger.info(f"✓ Step 2 complete: Stored structured JSON for application {application.id}")
 
-            await self.db.flush()
-
-        # Parse resume text if we have text but no structured JSON
-        elif not application.resume_parsed_json and application.resume_url:
-            logger.info(f"Parsing resume structure for application {application.id}")
-            # Download in thread pool
-            pdf_bytes = await asyncio.to_thread(
-                storage_service.download_file, application.resume_url
-            )
-            # Parse in thread pool
-            parse_result = await asyncio.to_thread(parse_resume, pdf_bytes)
-            application.resume_parsed_json = parse_result
-            await self.db.flush()
+            except Exception as e:
+                logger.error(f"Step 2 failed to parse markdown to JSON: {e}")
+                # Continue with evaluation using just the markdown
+                # JSON is optional for evaluation
+                pass
 
         # Evaluate candidate against framework (run in thread pool to avoid blocking)
         logger.info(f"Evaluating application {application.id} against framework")
