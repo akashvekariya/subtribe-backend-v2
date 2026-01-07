@@ -224,6 +224,8 @@ jobs:
           BACKEND_URL: "${{ vars.BACKEND_URL }}"
           # Dashboard URL (for email links - invites, verification)
           DASHBOARD_URL: "${{ vars.DASHBOARD_URL }}"
+          # AI Resume Evaluation Service URL (for Cloud Tasks callbacks)
+          AI_RESUME_EVAL_SERVICE_URL: "${{ vars.BACKEND_URL }}"
           # Cookie Configuration (HTTP-only cookie authentication)
           COOKIE_SECURE: "true"
           COOKIE_SAMESITE: "Lax"
