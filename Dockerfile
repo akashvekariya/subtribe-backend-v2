@@ -4,14 +4,25 @@ FROM python:3.13-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (including git for private repo access)
 RUN apt-get update && apt-get install -y \
     postgresql-client \
+    git \
     && rm -rf /var/lib/apt/lists/*
+
+# GitHub token for private repo access (passed as build arg)
+ARG GITHUB_TOKEN
+ENV GITHUB_TOKEN=${GITHUB_TOKEN}
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN if [ -n "$GITHUB_TOKEN" ]; then \
+        # Configure git to use token for private repos
+        git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi && \
+    pip install --no-cache-dir -r requirements.txt && \
+    # Clean up git config for security
+    git config --global --unset-all url."https://${GITHUB_TOKEN}@github.com/".insteadOf || true
 
 # Copy application code
 COPY app/ ./app/

@@ -164,6 +164,7 @@ jobs:
           echo "🔨 Building Docker image for Staging..."
           echo "📦 Branch Tag: ${{ steps.branch_name.outputs.sanitized_branch }}"
           docker build \
+            --build-arg GITHUB_TOKEN=${{ secrets.SUBTRIBE_AI_TOKEN }} \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ steps.branch_name.outputs.sanitized_branch }} \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest \
