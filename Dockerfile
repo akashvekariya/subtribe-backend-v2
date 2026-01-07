@@ -35,6 +35,11 @@ RUN set -e && \
     baml-cli generate --from src/subtribe_ai/baml_src && \
     echo "Installing subtribe-ai package..." && \
     pip install --no-cache-dir . && \
+    echo "Copying generated baml_client to installed package..." && \
+    SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])") && \
+    cp -r src/subtribe_ai/baml_client "${SITE_PACKAGES}/subtribe_ai/" && \
+    echo "Verifying baml_client installation..." && \
+    python -c "from subtribe_ai.baml_client import b; print('✓ baml_client imported successfully')" && \
     cd / && \
     rm -rf /tmp/subtribe-ai && \
     unset GITHUB_TOKEN
