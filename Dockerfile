@@ -16,9 +16,13 @@ ENV GITHUB_TOKEN=${GITHUB_TOKEN}
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN if [ -n "$GITHUB_TOKEN" ]; then \
+RUN set -e && \
+    if [ -n "$GITHUB_TOKEN" ]; then \
         # Configure git to use token for private repos
         git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    else \
+        echo "ERROR: GITHUB_TOKEN not provided. Cannot install private subtribe-ai package." && \
+        exit 1; \
     fi && \
     pip install --no-cache-dir -r requirements.txt && \
     # Clean up git config for security
