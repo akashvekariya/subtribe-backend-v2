@@ -17,16 +17,14 @@ ENV GITHUB_TOKEN=${GITHUB_TOKEN}
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN set -e && \
-    if [ -n "$GITHUB_TOKEN" ]; then \
-        # Configure git to use token for private repos
-        git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"; \
-    else \
+    if [ -z "$GITHUB_TOKEN" ]; then \
         echo "ERROR: GITHUB_TOKEN not provided. Cannot install private subtribe-ai package." && \
         exit 1; \
     fi && \
+    git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/" && \
     pip install --no-cache-dir -r requirements.txt && \
-    # Clean up git config for security
-    git config --global --unset-all url."https://${GITHUB_TOKEN}@github.com/".insteadOf || true
+    git config --global --unset-all url."https://${GITHUB_TOKEN}@github.com/".insteadOf || true && \
+    unset GITHUB_TOKEN
 
 # Copy application code
 COPY app/ ./app/
@@ -39,4 +37,4 @@ EXPOSE 8080
 
 # Run the application
 # --no-access-log: Disable uvicorn access logs (we use our logging middleware instead)
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --no-access-log
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --no-access-log"]
