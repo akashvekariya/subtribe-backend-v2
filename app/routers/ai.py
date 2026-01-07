@@ -14,7 +14,6 @@ from app.schemas.ai import (
     EvaluateCandidateResponse,
     ExtractFactsRequest,
     ExtractFactsResponse,
-    LinkMapping,
     ParseJobRequest,
     ParseJobResponse,
     ParseResumeRequest,

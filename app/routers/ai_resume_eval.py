@@ -491,7 +491,7 @@ async def debug_batch_tasks(
     """
     Debug endpoint to see all tasks in a batch.
     """
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
 
     from app.models.ai_resume_eval_task import AIResumeEvalTask
 
