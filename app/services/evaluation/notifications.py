@@ -86,16 +86,12 @@ class AIResumeEvalNotifier:
         """Build notification content for batch completion."""
         success_rate = 0
         if batch.total_count > 0:
-            success_rate = round(
-                (batch.completed_count / batch.total_count) * 100, 1
-            )
+            success_rate = round((batch.completed_count / batch.total_count) * 100, 1)
 
         # Calculate duration
         duration_seconds = None
         if batch.started_at and batch.completed_at:
-            duration_seconds = int(
-                (batch.completed_at - batch.started_at).total_seconds()
-            )
+            duration_seconds = int((batch.completed_at - batch.started_at).total_seconds())
 
         return {
             "type": "batch_complete",

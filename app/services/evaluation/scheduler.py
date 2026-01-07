@@ -307,9 +307,11 @@ class AIResumeEvalScheduler:
             return None
 
         # Count tasks by status
-        stmt = select(
-            AIResumeEvalTask.status, func.count(AIResumeEvalTask.id)
-        ).where(AIResumeEvalTask.batch_id == batch_id).group_by(AIResumeEvalTask.status)
+        stmt = (
+            select(AIResumeEvalTask.status, func.count(AIResumeEvalTask.id))
+            .where(AIResumeEvalTask.batch_id == batch_id)
+            .group_by(AIResumeEvalTask.status)
+        )
 
         result = await self.db.execute(stmt)
         status_counts = dict(result.all())
@@ -323,7 +325,9 @@ class AIResumeEvalScheduler:
         if batch.is_complete and batch.status == "processing":
             batch.status = "completed"
             batch.completed_at = datetime.now(timezone.utc)
-            logger.info(f"Batch {batch_id} completed: {batch.completed_count} success, {batch.failed_count} failed")
+            logger.info(
+                f"Batch {batch_id} completed: {batch.completed_count} success, {batch.failed_count} failed"
+            )
 
         return batch
 

@@ -267,8 +267,8 @@ def parse_resume(
         )
 
         name = result.get("personal_info", {}).get("full_name", "Unknown")
-        total_months = result.get("computed", {}).get("experience_summary", {}).get(
-            "total_months", 0
+        total_months = (
+            result.get("computed", {}).get("experience_summary", {}).get("total_months", 0)
         )
         logger.info(f"[resume] {name} - {total_months}mo exp - {elapsed:.2f}s")
         return response

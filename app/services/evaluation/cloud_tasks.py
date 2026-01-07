@@ -32,8 +32,7 @@ def _get_tasks_client():
             _tasks_client = tasks_v2.CloudTasksClient()
         except ImportError:
             logger.warning(
-                "google-cloud-tasks not installed. "
-                "Cloud Tasks integration will be disabled."
+                "google-cloud-tasks not installed. Cloud Tasks integration will be disabled."
             )
             return None
         except Exception as e:
@@ -71,6 +70,7 @@ class CloudTasksManager:
     def service_url(self) -> str:
         """Get service URL from settings (loaded at runtime)."""
         from app.config import settings
+
         return settings.ai_resume_eval_service_url
 
     @property
@@ -206,8 +206,7 @@ class CloudTasksManager:
                 results["failed"] += 1
 
         logger.info(
-            f"Queued {results['queued']}/{results['total']} tasks "
-            f"(stagger: {stagger_seconds}s)"
+            f"Queued {results['queued']}/{results['total']} tasks (stagger: {stagger_seconds}s)"
         )
 
         return results

@@ -548,7 +548,9 @@ async def get_job_calibration(
         calibration_summary=job.calibration_summary,
         evaluation_framework=job.evaluation_framework,
         calibrated_at=job.calibrated_at,
-        message="Calibration retrieved successfully" if job.calibrated_at else "Job not calibrated yet",
+        message="Calibration retrieved successfully"
+        if job.calibrated_at
+        else "Job not calibrated yet",
     )
 
 

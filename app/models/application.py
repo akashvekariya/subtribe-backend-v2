@@ -97,7 +97,9 @@ class Application(Base):
         String(50), nullable=True
     )  # pending, processing, completed, failed, skipped
     ai_resume_eval_batch_id: Mapped[UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("ai_resume_eval_batches.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True),
+        ForeignKey("ai_resume_eval_batches.id", ondelete="SET NULL"),
+        nullable=True,
     )  # Reference to the batch this application was evaluated in
 
     # Pipeline Status

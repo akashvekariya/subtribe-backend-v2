@@ -76,9 +76,7 @@ class AIResumeEvalService:
             raise ValueError(f"Job {job_id} not found")
 
         if not job.evaluation_framework:
-            raise ValueError(
-                f"Job {job_id} is not calibrated. Please complete calibration first."
-            )
+            raise ValueError(f"Job {job_id} is not calibrated. Please complete calibration first.")
 
         # Create batch
         batch = await self.scheduler.create_batch_for_job(
@@ -337,12 +335,9 @@ class AIResumeEvalService:
             return False
 
         # Cancel all pending/queued tasks
-        stmt = (
-            select(AIResumeEvalTask)
-            .where(
-                AIResumeEvalTask.batch_id == batch_id,
-                AIResumeEvalTask.status.in_(["pending", "queued", "retry_scheduled"]),
-            )
+        stmt = select(AIResumeEvalTask).where(
+            AIResumeEvalTask.batch_id == batch_id,
+            AIResumeEvalTask.status.in_(["pending", "queued", "retry_scheduled"]),
         )
         result = await self.db.execute(stmt)
         tasks = result.scalars().all()
@@ -379,12 +374,9 @@ class AIResumeEvalService:
         Returns:
             Number of tasks queued for retry
         """
-        stmt = (
-            select(AIResumeEvalTask)
-            .where(
-                AIResumeEvalTask.batch_id == batch_id,
-                AIResumeEvalTask.status.in_(["failed", "skipped", "queued", "pending"]),
-            )
+        stmt = select(AIResumeEvalTask).where(
+            AIResumeEvalTask.batch_id == batch_id,
+            AIResumeEvalTask.status.in_(["failed", "skipped", "queued", "pending"]),
         )
         result = await self.db.execute(stmt)
         tasks = result.scalars().all()
@@ -428,8 +420,7 @@ class AIResumeEvalService:
         count = 0
         for task in tasks:
             logger.warning(
-                f"Task {task.id} appears stuck (started {task.started_at}). "
-                f"Rescheduling..."
+                f"Task {task.id} appears stuck (started {task.started_at}). Rescheduling..."
             )
             task.status = "retry_scheduled"
             task.next_retry_at = datetime.now(timezone.utc)

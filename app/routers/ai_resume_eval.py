@@ -185,9 +185,7 @@ async def start_job_evaluation(
             total_count=batch.total_count,
             estimated_seconds=batch.estimated_seconds,
             estimated_completion_at=(
-                batch.estimated_completion_at.isoformat()
-                if batch.estimated_completion_at
-                else None
+                batch.estimated_completion_at.isoformat() if batch.estimated_completion_at else None
             ),
             status=batch.status,
             message=f"Started evaluation for {batch.total_count} applications",
@@ -456,23 +454,25 @@ async def process_local_tasks(
                 )
             else:
                 results["failed"] += 1
-                results["errors"].append({
-                    "task_id": str(task.id),
-                    "error": process_result.get("error", "Unknown error"),
-                })
+                results["errors"].append(
+                    {
+                        "task_id": str(task.id),
+                        "error": process_result.get("error", "Unknown error"),
+                    }
+                )
         except Exception as e:
             await db.rollback()
             results["failed"] += 1
-            results["errors"].append({
-                "task_id": str(task.id),
-                "error": str(e),
-            })
+            results["errors"].append(
+                {
+                    "task_id": str(task.id),
+                    "error": str(e),
+                }
+            )
             logger.exception(f"Failed to process task {task.id}: {e}")
 
     # Count remaining pending tasks
-    count_stmt = select(AIResumeEvalTask).where(
-        AIResumeEvalTask.status.in_(["pending", "queued"])
-    )
+    count_stmt = select(AIResumeEvalTask).where(AIResumeEvalTask.status.in_(["pending", "queued"]))
     remaining_result = await db.execute(count_stmt)
     remaining_count = len(remaining_result.scalars().all())
 
@@ -501,9 +501,11 @@ async def debug_batch_tasks(
     tasks = result.scalars().all()
 
     # Count by status
-    status_stmt = select(
-        AIResumeEvalTask.status, func.count(AIResumeEvalTask.id)
-    ).where(AIResumeEvalTask.batch_id == batch_id).group_by(AIResumeEvalTask.status)
+    status_stmt = (
+        select(AIResumeEvalTask.status, func.count(AIResumeEvalTask.id))
+        .where(AIResumeEvalTask.batch_id == batch_id)
+        .group_by(AIResumeEvalTask.status)
+    )
     status_result = await db.execute(status_stmt)
     status_counts = dict(status_result.all())
 

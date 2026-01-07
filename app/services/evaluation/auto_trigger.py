@@ -124,12 +124,16 @@ async def trigger_evaluation_for_job(
             return 0
 
         # Get unevaluated applications with resumes (worker will parse)
-        stmt = select(Application).where(
-            Application.job_id == job_id,
-            Application.deleted_at.is_(None),
-            Application.ai_resume_eval_status.is_(None),
-            Application.resume_url.isnot(None),
-        ).limit(max_applications)
+        stmt = (
+            select(Application)
+            .where(
+                Application.job_id == job_id,
+                Application.deleted_at.is_(None),
+                Application.ai_resume_eval_status.is_(None),
+                Application.resume_url.isnot(None),
+            )
+            .limit(max_applications)
+        )
 
         result = await db.execute(stmt)
         applications = result.scalars().all()

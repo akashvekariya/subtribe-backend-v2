@@ -94,9 +94,7 @@ class AIResumeEvalWorker:
         # Load application and job
         application = await self.db.get(Application, task.application_id)
         if not application:
-            await self._mark_task_failed(
-                task, "Application not found", ErrorCode.NOT_FOUND
-            )
+            await self._mark_task_failed(task, "Application not found", ErrorCode.NOT_FOUND)
             return {"success": False, "error": "Application not found"}
 
         batch = await self.db.get(AIResumeEvalBatch, task.batch_id)
@@ -322,9 +320,7 @@ class AIResumeEvalWorker:
         # Check if we should retry
         if should_retry(classified.code, task.attempt_count, task.max_attempts):
             # Schedule retry
-            retry_time = calculate_next_retry_time(
-                classified.base_delay, task.attempt_count - 1
-            )
+            retry_time = calculate_next_retry_time(classified.base_delay, task.attempt_count - 1)
             task.schedule_retry(
                 classified.message,
                 classified.code.value,

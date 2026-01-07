@@ -76,18 +76,10 @@ class AIResumeEvalTask(Base):
     )  # rate_limit, timeout, api_error, parse_error, auth_error, unknown
 
     # Timing
-    scheduled_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
-    started_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
-    next_retry_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
+    scheduled_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    next_retry_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     # Cloud Task reference
     cloud_task_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -108,9 +100,7 @@ class AIResumeEvalTask(Base):
     )
 
     # Relationships
-    batch: Mapped[AIResumeEvalBatch] = relationship(
-        "AIResumeEvalBatch", back_populates="tasks"
-    )
+    batch: Mapped[AIResumeEvalBatch] = relationship("AIResumeEvalBatch", back_populates="tasks")
     application: Mapped[Application] = relationship("Application")
 
     # Constraints & Indexes
