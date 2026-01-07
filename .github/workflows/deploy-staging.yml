@@ -200,6 +200,8 @@ jobs:
           DASHBOARD_URL: "${{ vars.DASHBOARD_URL }}"
           # AI Resume Evaluation Service URL (for Cloud Tasks callbacks)
           AI_RESUME_EVAL_SERVICE_URL: "${{ vars.BACKEND_URL }}"
+          # Google API Key (for Gemini AI - resume parsing and evaluation)
+          GOOGLE_API_KEY: "${{ secrets.GOOGLE_API_KEY }}"
           # Cookie Configuration (HTTP-only cookie authentication)
           COOKIE_SECURE: "true"
           COOKIE_SAMESITE: "Lax"
