@@ -184,7 +184,9 @@ class AIResumeEvalWorker:
             if not application.resume_url:
                 raise ValueError("No resume available for evaluation")
 
-            logger.info(f"Step 1: Downloading and extracting markdown from PDF for application {application.id}")
+            logger.info(
+                f"Step 1: Downloading and extracting markdown from PDF for application {application.id}"
+            )
 
             # Download PDF from GCS (run in thread pool to avoid blocking)
             pdf_bytes = await asyncio.to_thread(
@@ -274,7 +276,9 @@ class AIResumeEvalWorker:
                 # Store structured JSON immediately (non-blocking) - CHECKPOINT 2
                 application.resume_parsed_json = parse_result
                 await self.db.flush()
-                logger.info(f"✓ Step 2 complete: Stored structured JSON for application {application.id}")
+                logger.info(
+                    f"✓ Step 2 complete: Stored structured JSON for application {application.id}"
+                )
 
             except Exception as e:
                 logger.error(f"Step 2 failed to parse markdown to JSON: {e}")
