@@ -197,11 +197,12 @@ class AIResumeEvalWorker:
                 # - PDF to markdown (Gemini)
                 # - Markdown to JSON (BAML)
                 # - Post-processing
+                # Returns: {"markdown": str, "parsed": dict}
                 parsed_result = await asyncio.to_thread(parse_resume, pdf_bytes)
 
-                # Store both markdown and structured JSON - CHECKPOINT
-                application.resume_parsed_md = parsed_result.get("markdown", "")
-                application.resume_parsed_json = parsed_result
+                # Store markdown and structured JSON separately - CHECKPOINT
+                application.resume_parsed_md = parsed_result["markdown"]
+                application.resume_parsed_json = parsed_result["parsed"]
                 await self.db.flush()
 
                 logger.info(

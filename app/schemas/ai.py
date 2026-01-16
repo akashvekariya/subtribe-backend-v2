@@ -114,15 +114,24 @@ class ParseResumeRequest(BaseModel):
 
 
 class ParseResumeResponse(BaseModel):
-    """Response from resume parsing."""
+    """Response from resume parsing.
+
+    Structure:
+    - personal_info: Personal details (name, email, phone, links, location)
+    - experience: {summary: {...}, entries: [...]} with duration_months in each entry
+    - education: {summary: {...}, entries: [...]} with highest_level and months_since_graduation
+    - projects: {summary: {...}, entries: [...]} with duration_months in each entry
+    - skills, certifications: As before
+    - markdown: The extracted markdown text
+    """
 
     personal_info: dict[str, Any]
-    experience: list[dict[str, Any]]
-    education: list[dict[str, Any]]
+    experience: dict[str, Any]  # {summary: {...}, entries: [...]}
+    education: dict[str, Any]  # {summary: {...}, entries: [...]}
     skills: dict[str, Any]
-    projects: list[dict[str, Any]] | None = None
+    projects: dict[str, Any] | None = None  # {summary: {...}, entries: [...]}
     certifications: list[dict[str, Any]] | None = None
-    computed: dict[str, Any]
+    markdown: str | None = None
     timing: dict[str, Any] | None = None
 
 

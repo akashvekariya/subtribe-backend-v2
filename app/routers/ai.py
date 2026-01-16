@@ -182,29 +182,29 @@ def parse_resume(
             ]
 
         # Call subtribe-ai function
+        # Returns: {"markdown": str, "parsed": dict}
         result = parse_resume_markdown(
             markdown_text=request.resume_markdown,
             link_mappings=link_mappings,
         )
 
         elapsed = time.time() - start
+        parsed = result["parsed"]
 
         # Build response
         response = ParseResumeResponse(
-            personal_info=result.get("personal_info", {}),
-            experience=result.get("experience", []),
-            education=result.get("education", []),
-            skills=result.get("skills", {}),
-            projects=result.get("projects"),
-            certifications=result.get("certifications"),
-            computed=result.get("computed", {}),
+            personal_info=parsed.get("personal_info", {}),
+            experience=parsed.get("experience", {}),
+            education=parsed.get("education", {}),
+            skills=parsed.get("skills", {}),
+            projects=parsed.get("projects"),
+            certifications=parsed.get("certifications"),
+            markdown=result["markdown"],
             timing={"seconds": round(elapsed, 2)},
         )
 
-        name = result.get("personal_info", {}).get("full_name", "Unknown")
-        total_months = (
-            result.get("computed", {}).get("experience_summary", {}).get("total_months", 0)
-        )
+        name = parsed.get("personal_info", {}).get("full_name", "Unknown")
+        total_months = parsed.get("experience", {}).get("summary", {}).get("total_months", 0)
         logger.info(f"[resume] {name} - {total_months}mo exp - {elapsed:.2f}s")
         return response
 
