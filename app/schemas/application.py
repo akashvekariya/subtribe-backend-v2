@@ -149,17 +149,25 @@ class ApplicationListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    job_id: UUID
     first_name: str
     last_name: str
     email: str
     phone: str | None
-    linkedin_url: str | None
     status: str
     applied_at: datetime
     # AI Evaluation fields
     evaluation_score: float | None = None
     evaluation_tier: str | None = None
+    is_dealbreaker: bool | None = None
+    is_flagged: bool | None = None
+
+    @field_validator("evaluation_score", mode="before")
+    @classmethod
+    def round_score(cls, v: float | None) -> float | None:
+        """Round evaluation score to 2 decimal places."""
+        if v is None:
+            return None
+        return round(v, 2)
 
 
 class JobBasic(BaseModel):
@@ -211,6 +219,8 @@ class ApplicationDetail(BaseModel):
     evaluation_json: dict | None = None
     evaluation_score: float | None = None
     evaluation_tier: str | None = None
+    is_dealbreaker: bool | None = None
+    is_flagged: bool | None = None
     evaluated_at: datetime | None = None
 
     # Metadata
@@ -218,6 +228,14 @@ class ApplicationDetail(BaseModel):
     applied_at: datetime
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("evaluation_score", mode="before")
+    @classmethod
+    def round_score(cls, v: float | None) -> float | None:
+        """Round evaluation score to 2 decimal places."""
+        if v is None:
+            return None
+        return round(v, 2)
 
 
 class ApplicationSubmitted(BaseModel):
@@ -240,6 +258,14 @@ class ApplicationListResponse(BaseModel):
 
     data: list[ApplicationListItem]
     pagination: PaginationMeta
+
+
+class ApplicationStatsResponse(BaseModel):
+    """Statistics summary for applications of a job."""
+
+    total_candidates: int
+    by_status: dict[str, int]
+    by_tier: dict[str, int]
 
 
 class UserBasic(BaseModel):
@@ -292,3 +318,33 @@ class ScheduledEmailsResponse(BaseModel):
     """Response with scheduled emails for an application."""
 
     data: list[ScheduledEmailItem]
+
+
+# ============================================================================
+# Evaluation Response Schemas
+# ============================================================================
+
+
+class EvaluationMeta(BaseModel):
+    """Metadata about the evaluation context."""
+
+    application_id: UUID
+    candidate_name: str
+    job_id: UUID
+    job_title: str
+    evaluated_at: datetime | None = None
+    status: str | None = None
+
+
+class EvaluationDetailResponse(BaseModel):
+    """Response with full evaluation details.
+
+    - data: Pass-through of AI evaluation result from subtribe_ai
+    - meta: Backend context about the evaluation
+    """
+
+    data: dict | None = Field(
+        None,
+        description="Full evaluation result from subtribe_ai.EvaluationResult",
+    )
+    meta: EvaluationMeta

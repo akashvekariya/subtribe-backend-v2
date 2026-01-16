@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.config import settings
 from app.exceptions import register_exception_handlers
@@ -21,6 +22,7 @@ from app.routers import (
     invites,
     jobs,
 )
+from app.routers.v1 import applications as v1_applications
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +146,9 @@ app.add_middleware(
     max_age=3600,  # Cache CORS preflight for 1 hour (reduces OPTIONS spam)
 )
 
+# 3. GZip compression for responses > 500 bytes
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # Exception handlers
 register_exception_handlers(app)
 
@@ -167,3 +172,4 @@ app.include_router(emails.email_router, prefix="/emails")
 app.include_router(emails.router, prefix="/emails")
 app.include_router(ai.router, prefix="/api/ai")
 app.include_router(ai_resume_eval.router, prefix="/api")
+app.include_router(v1_applications.router, prefix="/api/v1")

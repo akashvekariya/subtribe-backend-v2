@@ -11,12 +11,13 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.exceptions import NotFoundError
+from app.exceptions import NotFoundError, ValidationError
 from app.models.application import Application
 from app.models.job import Job
 from app.schemas.application import (
     ApplicationListItem,
     ApplicationListResponse,
+    ApplicationStatsResponse,
 )
 from app.schemas.common import PaginationMeta
 from app.schemas.job import (
@@ -591,11 +592,20 @@ async def get_public_job(
     return job
 
 
+VALID_STATUSES = {"applied", "screening", "interviewing", "offer", "hired", "rejected"}
+VALID_TIERS = {"strong_match", "good_match", "moderate_match", "weak_match", "mismatch"}
+
+
 @router.get("/{job_id}/applications", response_model=ApplicationListResponse, tags=["Applications"])
 async def list_job_applications(
     job_id: UUID,
-    status_filter: str | None = Query(
-        None, alias="status", pattern="^(applied|screening|interviewing|offer|hired|rejected)$"
+    status: str | None = Query(None, description="Filter by status (comma-separated for multiple)"),
+    tier: str | None = Query(
+        None, description="Filter by evaluation tier (comma-separated for multiple)"
+    ),
+    is_dealbreaker: bool | None = Query(None, description="Filter by dealbreaker status"),
+    is_flagged: bool | None = Query(
+        None, description="Filter by flagged status (manipulation detected)"
     ),
     search: str | None = Query(None, max_length=100, description="Search by name or email"),
     sort_by: str | None = Query(
@@ -617,7 +627,10 @@ async def list_job_applications(
     List applications for a job.
 
     - **job_id**: Job UUID
-    - **status**: Filter by status (optional)
+    - **status**: Filter by status, comma-separated for multiple (e.g., ?status=applied,screening)
+    - **tier**: Filter by evaluation tier, comma-separated for multiple (e.g., ?tier=strong_match,good_match)
+    - **is_dealbreaker**: Filter by dealbreaker status (true/false)
+    - **is_flagged**: Filter by flagged status (true/false)
     - **search**: Search by candidate name or email (optional)
     - **sort_by**: Sort field - applied_at, name, status, ai_score (optional)
     - **sort_dir**: Sort direction - asc or desc (optional, default: desc)
@@ -626,6 +639,27 @@ async def list_job_applications(
 
     Returns paginated list of applications.
     """
+    # Parse and validate status values
+    status_list: list[str] | None = None
+    if status:
+        status_list = [s.strip() for s in status.split(",") if s.strip()]
+        invalid = set(status_list) - VALID_STATUSES
+        if invalid:
+            raise ValidationError(
+                message=f"Invalid status values: {', '.join(invalid)}",
+                code="invalid_status",
+            )
+
+    # Parse and validate tier values
+    tier_list: list[str] | None = None
+    if tier:
+        tier_list = [t.strip() for t in tier.split(",") if t.strip()]
+        invalid = set(tier_list) - VALID_TIERS
+        if invalid:
+            raise ValidationError(
+                message=f"Invalid tier values: {', '.join(invalid)}",
+                code="invalid_tier",
+            )
     # 1. Verify job exists and belongs to user's company
     result = await db.execute(
         select(Job).where(Job.id == job_id, Job.company_id == current_user["company_id"])
@@ -640,8 +674,17 @@ async def list_job_applications(
         Application.job_id == job_id, Application.deleted_at.is_(None)
     )
 
-    if status_filter:
-        query = query.where(Application.status == status_filter)
+    if status_list:
+        query = query.where(Application.status.in_(status_list))
+
+    if tier_list:
+        query = query.where(Application.evaluation_tier.in_(tier_list))
+
+    if is_dealbreaker is not None:
+        query = query.where(Application.is_dealbreaker == is_dealbreaker)
+
+    if is_flagged is not None:
+        query = query.where(Application.is_flagged == is_flagged)
 
     # 3. Apply search filter (name or email)
     if search:
@@ -664,7 +707,7 @@ async def list_job_applications(
     elif sort_by == "status":
         sort_column = Application.status
     elif sort_by == "ai_score":
-        sort_column = Application.ai_score
+        sort_column = Application.evaluation_score
     else:
         # Default to applied_at
         sort_column = Application.applied_at
@@ -680,8 +723,14 @@ async def list_job_applications(
         .select_from(Application)
         .where(Application.job_id == job_id, Application.deleted_at.is_(None))
     )
-    if status_filter:
-        count_query = count_query.where(Application.status == status_filter)
+    if status_list:
+        count_query = count_query.where(Application.status.in_(status_list))
+    if tier_list:
+        count_query = count_query.where(Application.evaluation_tier.in_(tier_list))
+    if is_dealbreaker is not None:
+        count_query = count_query.where(Application.is_dealbreaker == is_dealbreaker)
+    if is_flagged is not None:
+        count_query = count_query.where(Application.is_flagged == is_flagged)
     if search:
         search_term = f"%{search.lower()}%"
         count_query = count_query.where(
@@ -715,4 +764,56 @@ async def list_job_applications(
         pagination=PaginationMeta(
             page=page, limit=limit, total=total, total_pages=total_pages, has_more=has_more
         ),
+    )
+
+
+@router.get(
+    "/{job_id}/applications/stats", response_model=ApplicationStatsResponse, tags=["Applications"]
+)
+async def get_job_applications_stats(
+    job_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get statistics summary for applications of a job.
+
+    Returns total count, breakdown by status, and breakdown by evaluation tier.
+    """
+    # 1. Verify job exists and belongs to user's company
+    result = await db.execute(
+        select(Job).where(Job.id == job_id, Job.company_id == current_user["company_id"])
+    )
+    job = result.scalar_one_or_none()
+
+    if not job:
+        raise NotFoundError(message="Job not found", code="job_not_found")
+
+    # 2. Single query: group by status and tier, aggregate in Python
+    result = await db.execute(
+        select(
+            Application.status,
+            Application.evaluation_tier,
+            func.count().label("count"),
+        )
+        .where(Application.job_id == job_id, Application.deleted_at.is_(None))
+        .group_by(Application.status, Application.evaluation_tier)
+    )
+    rows = result.all()
+
+    # 3. Aggregate results in Python (single table scan)
+    total_candidates = 0
+    by_status: dict[str, int] = {}
+    by_tier: dict[str, int] = {}
+
+    for row in rows:
+        total_candidates += row.count
+        by_status[row.status] = by_status.get(row.status, 0) + row.count
+        if row.evaluation_tier:
+            by_tier[row.evaluation_tier] = by_tier.get(row.evaluation_tier, 0) + row.count
+
+    return ApplicationStatsResponse(
+        total_candidates=total_candidates,
+        by_status=by_status,
+        by_tier=by_tier,
     )

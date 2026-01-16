@@ -95,28 +95,6 @@ class CreateFrameworkResponse(BaseModel):
 
 
 # ============================================================================
-# Fact Extraction
-# ============================================================================
-
-
-class ExtractFactsRequest(BaseModel):
-    """Request to extract facts from a resume."""
-
-    resume_text: str
-    skill_ids: list[str] | None = None
-
-
-class ExtractFactsResponse(BaseModel):
-    """Response from fact extraction."""
-
-    experience: dict[str, Any]
-    education: list[dict[str, Any]]
-    certifications: list[dict[str, Any]]
-    skill_keywords: list[str]
-    timing: dict[str, Any] | None = None
-
-
-# ============================================================================
 # Resume Parsing
 # ============================================================================
 
@@ -157,7 +135,7 @@ class EvaluateCandidateRequest(BaseModel):
     """Request to evaluate a candidate against a framework."""
 
     framework: dict[str, Any]
-    candidate_resume: str
+    parsed_resume: dict[str, Any]  # Parsed resume JSON from parse_resume_markdown()
 
 
 class ScoresResult(BaseModel):
@@ -166,15 +144,30 @@ class ScoresResult(BaseModel):
     final_score: float
     tier: str
     dimension_scores: dict[str, float]
+    verification_confidence: str = "medium"
 
 
 class EvaluateCandidateResponse(BaseModel):
-    """Response from candidate evaluation."""
+    """Response from candidate evaluation.
+
+    Structure matches subtribe-ai EvaluationResult:
+    - scores: final_score, tier, dimension_scores, verification_confidence
+    - manipulation_check: detected, details
+    - red_flags: flags list and summary
+    - blockers: list of blocking issues (dealbreaker failures)
+    - can_proceed: whether candidate passes initial screening
+    - analysis: skill_analysis, constraint_analysis, tradeoff_analysis, source_summary
+    - evaluation: experience_entries, skill_matches, constraint_results, etc.
+    - warnings: list of post-processing warnings
+    - timing: evaluation timing info
+    """
 
     scores: ScoresResult
-    skill_matches: list[dict[str, Any]]
-    constraint_results: dict[str, Any]
-    tradeoff_alignment: dict[str, Any]
-    summary: dict[str, Any]
-    computed_facts: dict[str, Any]
+    manipulation_check: dict[str, Any]
+    red_flags: dict[str, Any]
+    blockers: list[dict[str, Any]]
+    can_proceed: bool
+    analysis: dict[str, Any]
+    evaluation: dict[str, Any]
+    warnings: list[dict[str, Any]] | None = None
     timing: dict[str, Any] | None = None

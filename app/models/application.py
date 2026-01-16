@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy import (
     TIMESTAMP,
+    Boolean,
     CheckConstraint,
     Float,
     ForeignKey,
@@ -68,6 +69,9 @@ class Application(Base):
         String(3000), nullable=False
     )  # GCS path: gs://bucket/{company_id}/{job_id}/{app_id}_resume.pdf
     resume_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    resume_file_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )  # SHA-256 hash of PDF bytes for duplicate detection
     resume_parsed_md: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # Gemini-extracted markdown from PDF
@@ -89,7 +93,13 @@ class Application(Base):
     )  # Final score (0-10 scale)
     evaluation_tier: Mapped[str | None] = mapped_column(
         String(50), nullable=True
-    )  # Tier: strong_match, good_match, moderate_match, weak_match, mismatch (+ _blocked/_flagged suffix)
+    )  # Tier: strong_match, good_match, moderate_match, weak_match, mismatch
+    is_dealbreaker: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True
+    )  # True if candidate failed a dealbreaker requirement
+    is_flagged: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True
+    )  # True if resume manipulation was detected
     evaluated_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )  # Timestamp when AI evaluation was completed

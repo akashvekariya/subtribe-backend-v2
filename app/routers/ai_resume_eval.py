@@ -17,6 +17,7 @@ from app.database import get_db
 from app.dependencies import get_current_user, require_role
 from app.models.ai_resume_eval_batch import AIResumeEvalBatch
 from app.models.job import Job
+from app.schemas.application import EvaluationDetailResponse
 from app.services.evaluation import (
     AIResumeEvalService,
     get_batch_status,
@@ -71,18 +72,6 @@ class JobEvaluationStatusResponse(BaseModel):
     job_id: str
     has_evaluation: bool
     latest_batch: BatchStatusResponse | None = None
-
-
-class ApplicationEvaluationResponse(BaseModel):
-    """Response with application evaluation results."""
-
-    application_id: str
-    evaluated: bool
-    status: str | None = None
-    score: float | None = None
-    tier: str | None = None
-    evaluated_at: str | None = None
-    evaluation: dict | None = None
 
 
 class CancelBatchResponse(BaseModel):
@@ -311,7 +300,7 @@ async def retry_failed_tasks(
 
 @router.get(
     "/applications/{application_id}",
-    response_model=ApplicationEvaluationResponse,
+    response_model=EvaluationDetailResponse,
 )
 async def get_application_evaluation(
     application_id: UUID,
@@ -320,6 +309,10 @@ async def get_application_evaluation(
 ):
     """
     Get evaluation results for a specific application.
+
+    Returns:
+        - data: Full AI evaluation result (pass-through from subtribe_ai)
+        - meta: Backend context (application_id, candidate_name, job info, status)
     """
     from app.models.application import Application
 
@@ -336,7 +329,7 @@ async def get_application_evaluation(
     if not result:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    return ApplicationEvaluationResponse(**result)
+    return EvaluationDetailResponse(**result)
 
 
 # =========================================================================

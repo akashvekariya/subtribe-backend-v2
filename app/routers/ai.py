@@ -12,8 +12,6 @@ from app.schemas.ai import (
     CreateFrameworkResponse,
     EvaluateCandidateRequest,
     EvaluateCandidateResponse,
-    ExtractFactsRequest,
-    ExtractFactsResponse,
     ParseJobRequest,
     ParseJobResponse,
     ParseResumeRequest,
@@ -141,69 +139,6 @@ def create_evaluation_framework(
 
 
 # ============================================================================
-# Fact Extraction
-# ============================================================================
-
-
-@router.post("/facts/extract", response_model=ExtractFactsResponse, tags=["AI"])
-def extract_resume_facts(
-    request: ExtractFactsRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Extract structured facts from a resume (Phase 1 only).
-
-    This is a standalone endpoint for testing fact extraction before
-    full candidate evaluation. Useful for:
-    - Testing date parsing logic
-    - Validating experience extraction
-    - Debugging anomaly detection
-
-    Returns enriched facts with:
-    - Experience entries (with calculated durations)
-    - Experience summary (totals, by type, gaps, overlaps)
-    - Education entries
-    - Certifications
-    - Skill keywords
-    """
-    start = time.time()
-    try:
-        from subtribe_ai import extract_facts
-
-        # Use provided skill_ids or empty list
-        skill_ids = request.skill_ids or []
-
-        # Extract facts using subtribe-ai
-        result = extract_facts(
-            resume_text=request.resume_text,
-            skill_ids=skill_ids,
-        )
-
-        elapsed = time.time() - start
-
-        # Build response
-        response = ExtractFactsResponse(
-            experience=result.get("experience", {}),
-            education=result.get("education", []),
-            certifications=result.get("certifications", []),
-            skill_keywords=result.get("skill_keywords", []),
-            timing={"seconds": round(elapsed, 2)},
-        )
-
-        total_years = result.get("experience", {}).get("total_years", 0)
-        entries = len(result.get("experience", {}).get("entries", []))
-        logger.info(f"[facts] {total_years}yr total, {entries} entries - {elapsed:.2f}s")
-        return response
-
-    except Exception as e:
-        logger.exception(f"Failed to extract facts: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to extract facts: {str(e)}",
-        ) from e
-
-
-# ============================================================================
 # Resume Parsing
 # ============================================================================
 
@@ -292,11 +227,11 @@ def evaluate_candidate(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Evaluate a candidate resume against an evaluation framework.
+    Evaluate a parsed candidate resume against an evaluation framework.
 
-    Two-phase pipeline:
-    - Phase 1: Extract facts (dates, experience) with deterministic tools
-    - Phase 2: Evaluate with pre-computed facts as ground truth
+    Expects:
+    - parsed_resume: Output from parse_resume_markdown() or parse_resume()
+    - framework: Evaluation framework from create_framework()
 
     Returns scored evaluation with:
     - Final score (0-10)
@@ -304,35 +239,38 @@ def evaluate_candidate(
     - Dimension scores (technical_fit, experience_fit, etc.)
     - Skill matches with evidence
     - Constraint results
-    - Tradeoff alignment
+    - Tradeoff analysis
     - Summary with strengths, concerns, and interview questions
-    - Computed facts (deterministic experience data)
+    - Blockers and warnings
     """
     start = time.time()
     try:
         from subtribe_ai import evaluate_candidate as ai_evaluate_candidate
 
-        # Call subtribe-ai function
+        # Call subtribe-ai function with parsed resume dict
         result = ai_evaluate_candidate(
-            resume_text=request.candidate_resume,
-            framework=request.framework,
+            request.parsed_resume,
+            request.framework,
         )
 
         elapsed = time.time() - start
 
-        # Build response
+        # Build response - structure matches subtribe-ai output
         scores = result.get("scores", {})
         response = EvaluateCandidateResponse(
             scores=ScoresResult(
                 final_score=scores.get("final_score", 0.0),
                 tier=scores.get("tier", "mismatch"),
                 dimension_scores=scores.get("dimension_scores", {}),
+                verification_confidence=scores.get("verification_confidence", "medium"),
             ),
-            skill_matches=result.get("skill_matches", []),
-            constraint_results=result.get("constraint_results", {}),
-            tradeoff_alignment=result.get("tradeoff_alignment", {}),
-            summary=result.get("summary", {}),
-            computed_facts=result.get("computed_facts", {}),
+            manipulation_check=result.get("manipulation_check", {}),
+            red_flags=result.get("red_flags", {}),
+            blockers=result.get("blockers", []),
+            can_proceed=result.get("can_proceed", True),
+            analysis=result.get("analysis", {}),
+            evaluation=result.get("evaluation", {}),
+            warnings=result.get("warnings"),
             timing=result.get("timing"),
         )
 

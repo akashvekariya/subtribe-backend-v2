@@ -287,29 +287,38 @@ class AIResumeEvalService:
             application_id: The application to check
 
         Returns:
-            Evaluation dict or None if not evaluated
+            Dict with 'data' (AI evaluation) and 'meta' (context), or None if not found
         """
-        application = await self.db.get(Application, application_id)
+        from sqlalchemy.orm import selectinload
+
+        # Load application with job relationship
+        stmt = (
+            select(Application)
+            .options(selectinload(Application.job))
+            .where(Application.id == application_id)
+        )
+        result = await self.db.execute(stmt)
+        application = result.scalar_one_or_none()
+
         if not application:
             return None
 
-        if not application.evaluation_json:
-            return {
-                "application_id": str(application_id),
-                "evaluated": False,
-                "status": application.ai_resume_eval_status,
-            }
+        # Build meta (always present)
+        meta = {
+            "application_id": application.id,
+            "candidate_name": f"{application.first_name} {application.last_name}",
+            "job_id": application.job_id,
+            "job_title": application.job.title if application.job else None,
+            "evaluated_at": application.evaluated_at,
+            "status": application.ai_resume_eval_status,
+        }
+
+        # Build data (AI evaluation result, None if not evaluated)
+        data = application.evaluation_json
 
         return {
-            "application_id": str(application_id),
-            "evaluated": True,
-            "status": application.ai_resume_eval_status,
-            "score": application.evaluation_score,
-            "tier": application.evaluation_tier,
-            "evaluated_at": (
-                application.evaluated_at.isoformat() if application.evaluated_at else None
-            ),
-            "evaluation": application.evaluation_json,
+            "data": data,
+            "meta": meta,
         }
 
     # =========================================================================
