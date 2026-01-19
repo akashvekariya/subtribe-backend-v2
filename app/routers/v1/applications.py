@@ -1,33 +1,206 @@
 """V1 Application endpoints with improved architecture.
 
-This module provides the new application submission endpoint that:
-- Generates SHA-256 hash of resume for duplicate detection
-- Sets explicit AI evaluation status for background processing
-- Uses cleaner separation between backend and AI package
+This module provides:
+- Application submission endpoint with hash-based duplicate detection
+- Resume display endpoint for structured resume viewing
 """
 
 import asyncio
 import hashlib
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from functools import partial
+from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_correlation_id
+from app.dependencies import get_correlation_id, get_current_user
 from app.exceptions import AppException, ConflictError, NotFoundError
 from app.models.application import Application
 from app.models.job import Job
 from app.models.status_history import ApplicationStatusHistory
 from app.schemas.application import ApplicationSubmitted
+from app.schemas.resume import (
+    Certification,
+    Education,
+    EducationEntry,
+    EducationSummary,
+    Experience,
+    ExperienceEntry,
+    ExperienceSummary,
+    OtherLink,
+    PersonalInfo,
+    ProjectEntry,
+    Projects,
+    ResumeData,
+    ResumeDisplayMeta,
+    ResumeDisplayResponse,
+    Skills,
+)
 from app.services.evaluation.auto_trigger import trigger_evaluation_for_application
 from app.services.storage import storage_service
 
 router = APIRouter(tags=["V1 Applications"])
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Resume Data Transformation
+# ============================================================================
+
+
+def _transform_resume_data(parsed_json: dict[str, Any] | None) -> ResumeData | None:
+    """Transform resume_parsed_json to ResumeData schema.
+
+    Cleans up internal fields and restructures data for frontend display.
+    """
+    if not parsed_json:
+        return None
+
+    # Personal Info
+    pi = parsed_json.get("personal_info", {})
+    other_links = []
+    for link in pi.get("other_links", []):
+        if isinstance(link, dict) and link.get("url"):
+            other_links.append(OtherLink(url=link["url"], label=link.get("label")))
+        elif isinstance(link, str):
+            other_links.append(OtherLink(url=link))
+
+    personal_info = PersonalInfo(
+        full_name=pi.get("full_name", ""),
+        email=pi.get("email"),
+        phone=pi.get("phone"),
+        location=pi.get("location"),
+        linkedin_url=pi.get("linkedin_url"),
+        github_url=pi.get("github_url"),
+        portfolio_url=pi.get("portfolio_url"),
+        other_links=other_links,
+    )
+
+    # Skills
+    skills_data = parsed_json.get("skills", {})
+    skills = Skills(
+        technical=skills_data.get("technical", []) if skills_data else [],
+        soft=skills_data.get("soft", []) if skills_data else [],
+        languages=skills_data.get("languages", []) if skills_data else [],
+    )
+
+    # Experience
+    exp_data = parsed_json.get("experience", {})
+    if isinstance(exp_data, dict):
+        exp_summary_data = exp_data.get("summary", {})
+        exp_entries_data = exp_data.get("entries", [])
+    else:
+        # Handle old format where experience is a list
+        exp_summary_data = {}
+        exp_entries_data = exp_data if isinstance(exp_data, list) else []
+
+    experience = Experience(
+        summary=ExperienceSummary(
+            total_months=exp_summary_data.get("total_months", 0),
+            by_category=exp_summary_data.get("by_category", {}),
+            has_overlaps=exp_summary_data.get("has_overlaps", False),
+            has_significant_gaps=exp_summary_data.get("has_significant_gaps", False),
+        ),
+        entries=[
+            ExperienceEntry(
+                title=e.get("title", ""),
+                company=e.get("company", ""),
+                location=e.get("location"),
+                category=e.get("category"),
+                start_date=e.get("start_date"),
+                end_date=e.get("end_date"),
+                is_ongoing=e.get("is_ongoing", False),
+                duration_months=e.get("duration_months"),
+                content=e.get("content", []),
+                skills=e.get("skills", []),
+            )
+            for e in exp_entries_data
+        ],
+    )
+
+    # Education
+    edu_data = parsed_json.get("education", {})
+    if isinstance(edu_data, dict):
+        edu_summary_data = edu_data.get("summary", {})
+        edu_entries_data = edu_data.get("entries", [])
+    else:
+        # Handle old format where education is a list
+        edu_summary_data = {}
+        edu_entries_data = edu_data if isinstance(edu_data, list) else []
+
+    education = Education(
+        summary=EducationSummary(
+            highest_level=edu_summary_data.get("highest_level"),
+            months_since_graduation=edu_summary_data.get("months_since_graduation"),
+        ),
+        entries=[
+            EducationEntry(
+                degree=e.get("degree", ""),
+                institution=e.get("institution", ""),
+                field_of_study=e.get("field_of_study"),
+                level=e.get("level"),
+                start_date=e.get("start_date"),
+                end_date=e.get("end_date"),
+                is_current=e.get("is_current", False),
+                score_value=e.get("score_value"),
+                relevant_coursework=e.get("relevant_coursework", []),
+            )
+            for e in edu_entries_data
+        ],
+    )
+
+    # Projects
+    proj_data = parsed_json.get("projects", {})
+    if isinstance(proj_data, dict):
+        proj_entries_data = proj_data.get("entries", [])
+    else:
+        # Handle old format where projects is a list
+        proj_entries_data = proj_data if isinstance(proj_data, list) else []
+
+    projects = Projects(
+        entries=[
+            ProjectEntry(
+                name=p.get("name", ""),
+                category=p.get("category"),
+                content=p.get("content", []),
+                skills=p.get("skills", []),
+                start_date=p.get("start_date"),
+                end_date=p.get("end_date"),
+                source_url=p.get("source_url"),
+                live_url=p.get("live_url"),
+            )
+            for p in proj_entries_data
+        ]
+    )
+
+    # Certifications
+    certs_data = parsed_json.get("certifications", [])
+    certifications = [
+        Certification(
+            name=c.get("name", ""),
+            issuer=c.get("issuer"),
+            date=c.get("date"),
+        )
+        for c in certs_data
+        if c.get("name")
+    ]
+
+    return ResumeData(
+        personal_info=personal_info,
+        professional_summary=parsed_json.get("professional_summary"),
+        skills=skills,
+        experience=experience,
+        education=education,
+        projects=projects,
+        certifications=certifications,
+    )
 
 
 @router.post(
@@ -250,3 +423,83 @@ async def submit_application_v1(
         )
 
     return ApplicationSubmitted(id=application.id)
+
+
+# ============================================================================
+# Resume Display Endpoint
+# ============================================================================
+
+
+@router.get(
+    "/applications/{application_id}/resume",
+    response_model=ResumeDisplayResponse,
+)
+async def get_application_resume(
+    application_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get parsed resume data for display.
+
+    Returns the structured resume data transformed for frontend rendering,
+    along with application metadata.
+
+    Args:
+        application_id: Application UUID
+
+    Returns:
+        ResumeDisplayResponse with:
+        - data: Transformed resume data (null if not yet parsed)
+        - meta: Application context and metadata
+    """
+    # Fetch application with job relationship
+    result = await db.execute(
+        select(Application)
+        .options(selectinload(Application.job))
+        .where(Application.id == application_id)
+    )
+    application = result.scalar_one_or_none()
+
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    # Verify user has access to this application's company
+    if str(application.company_id) != current_user["company_id"]:
+        raise HTTPException(status_code=403, detail="Access denied to this application")
+
+    # Transform resume data
+    resume_data = _transform_resume_data(application.resume_parsed_json)
+
+    # Generate signed URL for resume viewing
+    signed_url = None
+    expires_at = None
+    if application.resume_url:
+        try:
+            loop = asyncio.get_event_loop()
+            signed_url = await loop.run_in_executor(
+                None, storage_service.get_resume_view_url, application.resume_url
+            )
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        except Exception as e:
+            logger.warning(
+                f"Failed to generate signed URL for resume: {e}",
+                extra={"application_id": str(application.id)},
+            )
+
+    # Build response
+    return ResumeDisplayResponse(
+        data=resume_data,
+        meta=ResumeDisplayMeta(
+            application_id=application.id,
+            candidate_name=f"{application.first_name} {application.last_name}",
+            job_id=application.job_id,
+            job_title=application.job.title if application.job else "Unknown",
+            resume_filename=application.resume_filename,
+            resume_url=signed_url,
+            resume_url_expires_at=expires_at,
+            has_cover_letter=bool(application.cover_letter),
+            cover_letter=application.cover_letter,
+            applied_at=application.applied_at,
+        ),
+    )
