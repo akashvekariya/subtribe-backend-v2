@@ -43,7 +43,7 @@ def _get_tasks_client():
 
 def _get_queue_path() -> str:
     """Get the full queue path."""
-    from app.config import settings
+    from app.core.config import settings
 
     project = settings.gcs_project_id
     location = settings.gcp_cloud_tasks_location
@@ -69,7 +69,7 @@ class CloudTasksManager:
     @property
     def service_url(self) -> str:
         """Get service URL from settings (loaded at runtime)."""
-        from app.config import settings
+        from app.core.config import settings
 
         return settings.ai_resume_eval_service_url
 

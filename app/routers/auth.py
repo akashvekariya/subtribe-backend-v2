@@ -1,21 +1,28 @@
 """Authentication endpoints."""
 
 import logging
-import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-import bcrypt
 from fastapi import APIRouter, Depends, Request, Response, status
-from jose import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
-from app.database import get_db
-from app.dependencies import get_current_user
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError, ValidationError
+from app.core.security import (
+    create_access_token,
+    delete_auth_cookie,
+    generate_password_reset_token,
+    generate_verification_token,
+    hash_password,
+    mask_email,
+    set_auth_cookie,
+    verify_password,
+)
 from app.email.providers import EmailMessage, SendGridEmailProvider, StubEmailProvider
-from app.exceptions import ConflictError, NotFoundError, UnauthorizedError, ValidationError
 from app.models.company import Company
 from app.models.invite import Invite
 from app.models.user import User
@@ -44,70 +51,6 @@ from app.utils.rate_limiter import password_reset_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-def hash_password(password: str) -> str:
-    """Hash a password using bcrypt."""
-    password_bytes = password.encode("utf-8")
-    salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password_bytes, salt)
-    return hashed.decode("utf-8")
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    password_bytes = plain_password.encode("utf-8")
-    hashed_bytes = hashed_password.encode("utf-8")
-    return bcrypt.checkpw(password_bytes, hashed_bytes)
-
-
-def create_access_token(
-    user_id: str,
-    company_id: str | None,
-    email: str,
-    first_name: str,
-    last_name: str,
-    email_verified: bool = False,
-) -> tuple[str, datetime]:
-    """Create JWT access token with user claims."""
-    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.jwt_expiry_days)
-
-    payload = {
-        "sub": user_id,
-        "company_id": company_id,
-        "email": email,
-        "first_name": first_name,
-        "last_name": last_name,
-        "email_verified": email_verified,
-        "exp": expires_at,
-    }
-
-    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
-    return token, expires_at
-
-
-def generate_verification_token() -> str:
-    """Generate a secure verification token."""
-    return secrets.token_urlsafe(32)
-
-
-def generate_invite_code() -> str:
-    """Generate a unique invite code (format: XXXXX-XXXXX)."""
-    part1 = secrets.token_hex(3).upper()[:5]
-    part2 = secrets.token_hex(3).upper()[:5]
-    return f"{part1}-{part2}"
-
-
-def generate_slug(name: str) -> str:
-    """Generate URL-safe slug from name."""
-    import re
-
-    slug = name.lower().strip()
-    slug = re.sub(r"[^a-z0-9]+", "-", slug)
-    slug = slug.strip("-")
-    # Add random suffix for uniqueness
-    suffix = secrets.token_hex(3)
-    return f"{slug}-{suffix}"
 
 
 def _get_email_provider():
@@ -154,22 +97,6 @@ If you didn't create this account, you can ignore this email.
         logger.error(f"Failed to send verification email to {user.email}: {result.error_message}")
 
     return result.success
-
-
-def set_auth_cookie(response: Response, token: str) -> None:
-    """Set httpOnly authentication cookie."""
-    cookie_kwargs = {
-        "key": "access_token",
-        "value": token,
-        "httponly": True,
-        "secure": settings.cookie_secure,
-        "samesite": settings.cookie_samesite,
-        "max_age": settings.cookie_max_age,
-        "path": "/",
-    }
-    if settings.cookie_domain:
-        cookie_kwargs["domain"] = settings.cookie_domain
-    response.set_cookie(**cookie_kwargs)
 
 
 def build_user_response(user: User, company: Company | None = None) -> UserResponse:
@@ -459,10 +386,7 @@ async def logout(response: Response):
     """
     Logout user by clearing authentication cookie.
     """
-    delete_kwargs = {"key": "access_token", "path": "/"}
-    if settings.cookie_domain:
-        delete_kwargs["domain"] = settings.cookie_domain
-    response.delete_cookie(**delete_kwargs)
+    delete_auth_cookie(response)
     return {"message": "Successfully logged out"}
 
 
@@ -645,28 +569,6 @@ async def claim_invite(
 # =============================================================================
 # Password Reset Endpoints
 # =============================================================================
-
-
-def generate_password_reset_token() -> str:
-    """Generate a secure password reset token (256-bit entropy)."""
-    return secrets.token_urlsafe(32)
-
-
-def mask_email(email: str) -> str:
-    """Mask an email address for privacy.
-
-    Example: user@example.com -> u***@example.com
-    """
-    parts = email.split("@")
-    if len(parts) != 2:
-        return "***@***"
-
-    local = parts[0]
-    domain = parts[1]
-
-    masked_local = "*" if len(local) <= 1 else local[0] + "***"
-
-    return f"{masked_local}@{domain}"
 
 
 async def send_password_reset_email(user: User, token: str) -> bool:

@@ -8,8 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from app.config import settings
-from app.exceptions import register_exception_handlers
+from app.core.config import settings
+from app.core.exceptions import register_exception_handlers
 from app.logging import LoggingMiddleware, setup_logging
 from app.routers import (
     ai,

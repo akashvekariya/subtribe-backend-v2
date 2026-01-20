@@ -9,11 +9,11 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
-from app.database import get_db
-from app.dependencies import get_current_user
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.email.providers import EmailMessage, SendGridEmailProvider, StubEmailProvider
-from app.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.models.company import Company
 from app.models.invite import Invite
 from app.models.user import User
