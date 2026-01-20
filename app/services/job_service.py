@@ -695,13 +695,12 @@ class JobService:
 
     def _get_sort_column(self, sort_by: str | None):
         """Get SQLAlchemy column for sorting."""
-        if sort_by == "name":
-            return Application.first_name
-        elif sort_by == "status":
-            return Application.status
-        elif sort_by == "ai_score":
-            return Application.evaluation_score
-        return Application.applied_at
+        sort_columns = {
+            "name": Application.first_name,
+            "status": Application.status,
+            "ai_score": Application.evaluation_score,
+        }
+        return sort_columns.get(sort_by, Application.applied_at)
 
     async def _get_filtered_count(
         self,
