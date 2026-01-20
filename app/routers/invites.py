@@ -1,7 +1,6 @@
 """Invite management endpoints."""
 
 import logging
-import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -13,6 +12,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
+from app.core.security import generate_invite_code
 from app.email.providers import EmailMessage, SendGridEmailProvider, StubEmailProvider
 from app.models.company import Company
 from app.models.invite import Invite
@@ -37,13 +37,6 @@ def is_super_admin(email: str) -> bool:
         return False
     admin_emails = [e.strip().lower() for e in settings.super_admin_emails.split(",") if e.strip()]
     return email.lower() in admin_emails
-
-
-def generate_invite_code() -> str:
-    """Generate a unique invite code (format: XXXXX-XXXXX)."""
-    part1 = secrets.token_hex(3).upper()[:5]
-    part2 = secrets.token_hex(3).upper()[:5]
-    return f"{part1}-{part2}"
 
 
 def _get_email_provider():

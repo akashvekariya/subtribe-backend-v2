@@ -1,6 +1,5 @@
 """Company management endpoints."""
 
-import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, status
@@ -17,6 +16,7 @@ from app.core.exceptions import (
     NotFoundError,
     ValidationError,
 )
+from app.core.security import generate_invite_code
 from app.models.company import Company
 from app.models.user import User
 from app.schemas.company import (
@@ -27,13 +27,6 @@ from app.schemas.company import (
 )
 
 router = APIRouter()
-
-
-def generate_invite_code() -> str:
-    """Generate a unique invite code (format: XXXXX-XXXXX)."""
-    part1 = secrets.token_hex(3).upper()[:5]
-    part2 = secrets.token_hex(3).upper()[:5]
-    return f"{part1}-{part2}"
 
 
 @router.get("/{company_id}", response_model=CompanyResponse, tags=["Companies"])
