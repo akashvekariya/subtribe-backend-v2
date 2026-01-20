@@ -576,13 +576,15 @@ fetch(`${PUBLIC_BASE}/jobs/${slug}/apply`, ...)
 - [x] Update imports (30+ files)
 - [x] Test and commit
 
-### Phase 2: Utilities
-- [ ] Create generators
-- [ ] Create cookies
-- [ ] Create validators
-- [ ] Update routers
-- [ ] Remove duplicates
-- [ ] Test
+### Phase 2: Utilities ✅ COMPLETED (2026-01-20)
+- [x] Create generators (merged into security.py)
+- [x] Create cookies (merged into security.py)
+- [x] Create validators (mask_email in security.py)
+- [x] Update routers to use security module
+- [x] Remove duplicate generate_invite_code from companies.py, invites.py
+- [x] Test and commit
+
+Note: jobs.py generate_slug() kept separate - uses UUID for uniqueness
 
 ### Phase 3: Services
 - [ ] Auth service
