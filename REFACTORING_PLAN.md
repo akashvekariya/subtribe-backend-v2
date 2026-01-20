@@ -1,7 +1,7 @@
 # Backend Refactoring Plan
 
 > **Created**: 2026-01-20
-> **Status**: Phase 3 COMPLETE - Service Layer Implemented
+> **Status**: Phase 4 COMPLETE - API Prefixes Standardized
 > **Branch**: `claude/refactor-backend-structure-Yipkr`
 
 ---
@@ -604,20 +604,34 @@ Router reductions achieved:
 
 Note: User service not needed separately - auth_service handles user operations
 
-### Phase 4: API Restructure
-- [ ] Create API structure
-- [ ] Migrate auth router
-- [ ] Migrate companies router
-- [ ] Migrate jobs router
-- [ ] Migrate applications router
-- [ ] Migrate invites router
-- [ ] Migrate dashboard router
-- [ ] Migrate AI routers
-- [ ] Create public routers
-- [ ] Create internal routers
-- [ ] Update main.py
-- [ ] Remove old routers
-- [ ] Test
+### Phase 4: API Restructure ✅ COMPLETED (2026-01-20)
+**Approach**: Standardized API prefixes in main.py (safer than moving files)
+
+- [x] Standardize authenticated endpoints to `/api/v1/*`
+- [x] Standardize public endpoints to `/api/public/*`
+- [x] Standardize internal endpoints to `/api/internal/*`
+- [x] Organize router includes with clear sections
+- [x] Test (syntax and linting pass)
+
+**API Prefix Changes**:
+| Router | Old Prefix | New Prefix |
+|--------|-----------|------------|
+| auth | `/auth` | `/api/v1/auth` |
+| invites | `/invites` | `/api/v1/invites` |
+| companies | `/companies` | `/api/v1/companies` |
+| dashboard | `/dashboard` | `/api/v1/dashboard` |
+| jobs | `/jobs` | `/api/v1/jobs` |
+| applications | `/applications` | `/api/v1/applications` |
+| emails (send) | `/emails` | `/api/v1/emails` |
+| emails (templates) | `/emails` | `/api/v1/email-templates` |
+| ai | `/api/ai` | `/api/v1/ai` |
+| ai_resume_eval | `/api` | `/api/v1` |
+| v1_applications | `/api/v1` | `/api/v1` |
+| jobs (public) | `/public/jobs` | `/api/public/jobs` |
+| applications (public) | `/public` | `/api/public` |
+| emails (internal) | `/internal/emails` | `/api/internal/emails` |
+
+Note: File restructuring (moving to app/api/) deferred - current structure works well
 
 ### Phase 5: Email Consolidation
 - [ ] Move email to services

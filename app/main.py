@@ -159,17 +159,34 @@ async def health_check():
     return {"status": "healthy", "environment": settings.environment}
 
 
-app.include_router(auth.router, prefix="/auth")
-app.include_router(invites.router, prefix="/invites")
-app.include_router(companies.router, prefix="/companies")
-app.include_router(dashboard.router, prefix="/dashboard")
-app.include_router(jobs.router, prefix="/jobs")
-app.include_router(jobs.public_router, prefix="/public/jobs")
-app.include_router(applications.public_router, prefix="/public")
-app.include_router(applications.router, prefix="/applications")
-app.include_router(emails.internal_router, prefix="/internal/emails")
-app.include_router(emails.email_router, prefix="/emails")
-app.include_router(emails.router, prefix="/emails")
-app.include_router(ai.router, prefix="/api/ai")
-app.include_router(ai_resume_eval.router, prefix="/api")
+# =============================================================================
+# API v1 Routes (Authenticated)
+# =============================================================================
+app.include_router(auth.router, prefix="/api/v1/auth")
+app.include_router(invites.router, prefix="/api/v1/invites")
+app.include_router(companies.router, prefix="/api/v1/companies")
+app.include_router(dashboard.router, prefix="/api/v1/dashboard")
+app.include_router(jobs.router, prefix="/api/v1/jobs")
+app.include_router(applications.router, prefix="/api/v1/applications")
+app.include_router(emails.email_router, prefix="/api/v1/emails")
+app.include_router(emails.router, prefix="/api/v1/email-templates")
+app.include_router(ai.router, prefix="/api/v1/ai")
+
+# AI Resume Evaluation routes (under /api/v1)
+# Note: These have paths like /jobs/{id}/start, /batches/*, /internal/*
+app.include_router(ai_resume_eval.router, prefix="/api/v1")
+
+# V1 Applications router (under /api/v1)
+# Note: Has /jobs/{slug}/apply and /applications/{id}/resume
 app.include_router(v1_applications.router, prefix="/api/v1")
+
+# =============================================================================
+# Public Routes (No Authentication)
+# =============================================================================
+app.include_router(jobs.public_router, prefix="/api/public/jobs")
+app.include_router(applications.public_router, prefix="/api/public")
+
+# =============================================================================
+# Internal Routes (For Cloud Tasks, Webhooks)
+# =============================================================================
+app.include_router(emails.internal_router, prefix="/api/internal/emails")
