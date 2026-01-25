@@ -6,7 +6,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 # Import app config
-from app.config import settings
+from app.core.config import settings
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -19,7 +19,7 @@ config.set_main_option("sqlalchemy.url", settings.database_url.replace("+asyncpg
 
 # Now import Base and models (after URL is set)
 # Import Base AFTER we set the URL to avoid async engine creation
-from app.database import Base  # noqa: E402
+from app.core.database import Base  # noqa: E402
 
 # Import all models so they register with Base.metadata
 

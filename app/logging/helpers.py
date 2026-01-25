@@ -13,7 +13,7 @@ See vibe-plan/logging.md for complete documentation.
 import logging
 from typing import Any
 
-from app.dependencies import get_correlation_id
+from app.core.dependencies import get_correlation_id
 from app.logging.utils import build_log_data, mask_sensitive_data
 
 logger = logging.getLogger(__name__)

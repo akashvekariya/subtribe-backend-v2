@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.dependencies import get_current_user, require_role
+from app.core.database import get_db
+from app.core.dependencies import get_current_user, require_role
 from app.models.ai_resume_eval_batch import AIResumeEvalBatch
 from app.models.job import Job
 from app.schemas.application import EvaluationDetailResponse

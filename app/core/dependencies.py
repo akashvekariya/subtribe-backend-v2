@@ -1,13 +1,14 @@
 """FastAPI dependencies for auth, database, etc."""
 
 from contextvars import ContextVar
+from typing import Any
 
 from fastapi import Cookie, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import ExpiredSignatureError, JWTError, jwt
 
-from app.config import settings
-from app.exceptions import ForbiddenError, UnauthorizedError
+from app.core.config import settings
+from app.core.exceptions import ForbiddenError, UnauthorizedError
 
 # Correlation ID context variable (thread-safe, async-safe)
 _correlation_id_ctx_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
@@ -43,7 +44,7 @@ async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     access_token: str | None = Cookie(None),
-) -> dict[str, any]:
+) -> dict[str, Any]:
     """
     Validate JWT from cookie or Authorization header.
 

@@ -11,7 +11,7 @@ Handles sending emails for:
 import logging
 from datetime import datetime, timezone
 
-from app.config import settings
+from app.core.config import settings
 from app.email.providers import EmailMessage, SendGridEmailProvider, StubEmailProvider
 from app.models.user import User
 

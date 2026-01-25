@@ -12,9 +12,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
-from app.database import get_db
-from app.dependencies import get_current_user
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.email.cloud_tasks import cloud_tasks_scheduler
 from app.email.email_service import EmailService
 from app.email.template_renderer import TemplateRenderer

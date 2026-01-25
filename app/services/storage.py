@@ -12,8 +12,8 @@ from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError
 from google.oauth2 import service_account
 
-from app.config import settings
-from app.dependencies import get_correlation_id
+from app.core.config import settings
+from app.core.dependencies import get_correlation_id
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.application import Application

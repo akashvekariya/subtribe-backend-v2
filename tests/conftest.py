@@ -17,9 +17,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.config import settings
-from app.database import get_db
-from app.dependencies import get_current_user
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.main import app
 from app.models.application import Application
 from app.models.company import Company
