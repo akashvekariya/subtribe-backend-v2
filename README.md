@@ -1,199 +1,53 @@
-# Subtribe ATS Backend
+# Subtribe Backend
 
-> **Status**: ✅ Production Deployed & Tested (2025-10-12)
+API for Subtribe, a multi-tenant applicant tracking system with AI candidate evaluation. Recruiting teams post jobs, collect applications and get every resume scored against what the role actually needs.
 
-Multi-tenant SaaS Applicant Tracking System for small-medium recruiting companies.
+Part of the Subtribe platform: [dashboard](https://github.com/akashvekariya/subtribe-dashboard-v2) for recruiters, [app](https://github.com/akashvekariya/subtribe-app-v2) for candidates, [AI engine](https://github.com/akashvekariya/subtribe-ai-v2).
 
-## Tech Stack
+## Features
 
-- **Framework**: FastAPI (Python 3.13)
-- **Database**: PostgreSQL (Supabase)
-- **Storage**: Google Cloud Storage
-- **Auth**: Supabase Auth
-- **Deployment**: Google Cloud Run
+- **Multi-tenant by design**: every company's data is isolated, with Postgres row-level security behind the application checks.
+- **Jobs and applications**: create and calibrate jobs, public job board and apply flow, status tracking with history.
+- **AI resume evaluation**: resumes are parsed and scored in the background through Cloud Tasks, with retries, stuck-job recovery and batch progress.
+- **Bulk upload**: drop in a folder of resumes for a job and track the batch.
+- **Teams**: invites, roles, email verification, password reset, httpOnly cookie sessions.
+- **Email**: templated transactional email through SendGrid, sent asynchronously.
+- **Observability**: structured JSON logs with request correlation IDs.
 
-## Quick Start
+## Stack
 
-### Prerequisites
-- Python 3.13+
-- PostgreSQL (Supabase account)
-- Google Cloud account (for GCS and Cloud Run)
+FastAPI, async SQLAlchemy, PostgreSQL (Supabase), Alembic, Google Cloud Storage, Cloud Tasks, Cloud Run, SendGrid, pytest, ruff.
 
-### Local Development
+## Run locally
 
 ```bash
-# 1. Clone and setup
-git clone <repo-url>
-cd subtribe-backend
-
-# 2. Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# 3. Install dependencies
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# 4. Configure environment
-cp .env.development.example .env
-# Edit .env with your credentials
-
-# 5. Run migrations
+cp .env.example .env                 # fill in your own values
 alembic upgrade head
-
-# 6. Start server
 uvicorn app.main:app --reload
 ```
 
-Server runs at `http://localhost:8000`
-- API docs: `http://localhost:8000/docs`
-- Health check: `http://localhost:8000/health`
+API docs at `http://localhost:8000/docs`.
 
-## Architecture
+## Tests
 
-### Multi-Tenancy
-- Row-level isolation via `company_id` filter in all queries
-- Single database, multiple companies
-- Each user belongs to one company
+```bash
+pytest
+```
 
-### Key Features
-- **Authentication**: Email/password via Supabase Auth
-- **Jobs**: Create, update, list, and close job postings
-- **Applications**: Public apply endpoint with resume upload
-- **Resumes**: Stored in GCS with signed URLs for access
-- **Status Tracking**: Track application status changes with history
+Unit, integration, end-to-end and response-time tests. CI runs lint and tests on every pull request and deploys to staging and production on Cloud Run.
 
-### Project Structure
+## Layout
+
 ```
 app/
-├── main.py                 # FastAPI app & routes
-├── config.py               # Environment configuration
-├── database.py             # Database connection
-├── dependencies.py         # Auth & DB dependencies
-├── exceptions.py           # Error handlers
-├── models/                 # SQLAlchemy models
-├── schemas/                # Pydantic schemas
-├── routers/                # API endpoints
-└── services/               # Business logic (storage, etc.)
+  routers/    HTTP endpoints (/api/v1, /api/public)
+  services/   business logic, evaluation worker, bulk upload
+  models/     SQLAlchemy models
+  schemas/    request and response models
+  email/      providers and templates
+  logging/    structured logging and middleware
+database/     migrations and row-level security policies
+tests/
 ```
-
-## API Endpoints
-
-### Public
-- `POST /jobs/{slug}/apply` - Submit job application
-
-### Auth
-- `POST /auth/register` - Register with company code
-- `POST /auth/login` - Login with email/password
-- `GET /auth/me` - Get current user
-
-### Jobs (Protected)
-- `POST /jobs` - Create job
-- `GET /jobs` - List company jobs
-- `GET /jobs/{id}` - Get job details
-- `PATCH /jobs/{id}` - Update job
-- `PATCH /jobs/{id}/close` - Close job
-
-### Applications (Protected)
-- `GET /applications/{id}` - Get application
-- `PATCH /applications/{id}` - Update status
-- `GET /applications/{id}/history` - Status history
-- `GET /applications/{id}/resume/view` - View resume
-- `GET /applications/{id}/resume/download` - Download resume
-
-### Companies (Protected)
-- `GET /companies/me` - Get company profile
-- `PATCH /companies/me` - Update company
-
-## Development
-
-### Code Quality
-```bash
-# Linting
-ruff check .
-
-# Formatting
-ruff format .
-
-# Type checking
-mypy app --ignore-missing-imports
-```
-
-### Database Migrations
-```bash
-# Create migration
-alembic revision --autogenerate -m "description"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback
-alembic downgrade -1
-```
-
-### Testing
-```bash
-# Run unit tests
-pytest tests/unit/ -v
-
-# Run specific test
-pytest tests/unit/test_schemas.py -v
-```
-
-## Deployment
-
-Automated CI/CD via GitHub Actions:
-- **Lint & Test**: Runs on all PRs and pushes
-- **Deploy**: Auto-deploys to Cloud Run on push to `main`
-- **Versioning**: Semantic versioning based on conventional commits
-
-See [`.github/README.md`](.github/README.md) for detailed setup instructions.
-
-## Environment Variables
-
-Required environment variables (see `.env.development.example`):
-
-```bash
-# Database
-DATABASE_URL=postgresql+asyncpg://...
-
-# Supabase Auth
-SUPABASE_URL=https://...
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_KEY=...
-SUPABASE_JWT_SECRET=...
-
-# Backend JWT
-JWT_SECRET_KEY=...
-JWT_ALGORITHM=HS256
-JWT_EXPIRY_DAYS=15
-
-# Google Cloud Storage
-GCS_BUCKET_NAME=...
-GCS_PROJECT_ID=...
-GOOGLE_APPLICATION_CREDENTIALS=path/to/key.json
-
-# App Config
-CORS_ORIGINS=["http://localhost:3000"]
-ENVIRONMENT=development
-```
-
-## Documentation
-
-**📚 [View Full Documentation on GitHub Wiki →](../../wiki)**
-
-### Quick Links
-- [Architecture](../../wiki/Architecture) - System design and tech stack
-- [API Reference](../../wiki/API-Reference) - Complete endpoint documentation
-- [Database Schema](../../wiki/Database-Schema) - Tables and relationships
-- [Development Guide](../../wiki/Development) - Local setup and patterns
-- [Deployment Guide](../../wiki/Deployment) - CI/CD and Cloud Run
-- [Project Status](../../wiki/Project-Status) - Current phase and roadmap
-
-### Additional Resources
-- **[CI/CD Setup](.github/README.md)** - GitHub Actions configuration guide
-- **[Legacy Docs](vibe-plan/)** - Original planning documents (archived)
-
-## License
-
-Proprietary - All rights reserved
-
