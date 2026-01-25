@@ -65,9 +65,7 @@ class InviteService:
         if not settings.super_admin_emails:
             return False
         admin_emails = [
-            e.strip().lower()
-            for e in settings.super_admin_emails.split(",")
-            if e.strip()
+            e.strip().lower() for e in settings.super_admin_emails.split(",") if e.strip()
         ]
         return email.lower() in admin_emails
 
@@ -110,8 +108,7 @@ class InviteService:
             result = await self.db.execute(stmt)
             creators = result.scalars().all()
             creators_map = {
-                str(c.id): InviteCreator(id=str(c.id), full_name=c.full_name)
-                for c in creators
+                str(c.id): InviteCreator(id=str(c.id), full_name=c.full_name) for c in creators
             }
 
         return [
@@ -164,9 +161,7 @@ class InviteService:
                 user_id, user_email, email, max_uses, inviter
             )
 
-        return await self._create_team_member_invite(
-            user_id, company_id, email, max_uses, inviter
-        )
+        return await self._create_team_member_invite(user_id, company_id, email, max_uses, inviter)
 
     async def get_invite(
         self, company_id: str | UUID, invite_id: UUID
@@ -377,9 +372,7 @@ class InviteService:
         email_sent = await self._send_org_creator_invite_email(invite, inviter)
 
         creator = (
-            InviteCreator(id=str(inviter.id), full_name=inviter.full_name)
-            if inviter
-            else None
+            InviteCreator(id=str(inviter.id), full_name=inviter.full_name) if inviter else None
         )
 
         return InviteResult(
@@ -412,9 +405,7 @@ class InviteService:
         company = result.scalar_one_or_none()
 
         if not company:
-            raise NotFoundError(
-                message="Organization not found", code="company_not_found"
-            )
+            raise NotFoundError(message="Organization not found", code="company_not_found")
 
         # Deactivate existing active invite
         stmt = select(Invite).where(
@@ -448,9 +439,7 @@ class InviteService:
         email_sent = await self._send_team_member_invite_email(invite, company, inviter)
 
         creator = (
-            InviteCreator(id=str(inviter.id), full_name=inviter.full_name)
-            if inviter
-            else None
+            InviteCreator(id=str(inviter.id), full_name=inviter.full_name) if inviter else None
         )
 
         return InviteResult(
@@ -501,15 +490,12 @@ If you weren't expecting this invitation, you can ignore this email.
             )
         else:
             logger.error(
-                f"Failed to send team member invite email to {invite.email}: "
-                f"{result.error_message}"
+                f"Failed to send team member invite email to {invite.email}: {result.error_message}"
             )
 
         return result.success
 
-    async def _send_org_creator_invite_email(
-        self, invite: Invite, inviter: User | None
-    ) -> bool:
+    async def _send_org_creator_invite_email(self, invite: Invite, inviter: User | None) -> bool:
         """Send invitation email to create organization."""
         invite_url = f"{settings.dashboard_url}/invite/{invite.code}"
         inviter_text = f"{inviter.full_name} has" if inviter else "You have been"
@@ -549,15 +535,12 @@ If you weren't expecting this invitation, you can ignore this email.
             logger.info(f"Org creator invite email sent to {invite.email}")
         else:
             logger.error(
-                f"Failed to send org creator invite email to {invite.email}: "
-                f"{result.error_message}"
+                f"Failed to send org creator invite email to {invite.email}: {result.error_message}"
             )
 
         return result.success
 
-    async def _get_invite_creator(
-        self, created_by: UUID | None
-    ) -> InviteCreator | None:
+    async def _get_invite_creator(self, created_by: UUID | None) -> InviteCreator | None:
         """Get invite creator info."""
         if not created_by:
             return None

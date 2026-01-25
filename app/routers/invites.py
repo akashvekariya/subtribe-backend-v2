@@ -72,8 +72,7 @@ async def list_invites(
 
     invites_with_creators = await service.list_invites(company_id)
     invite_responses = [
-        _build_invite_response(invite, creator)
-        for invite, creator in invites_with_creators
+        _build_invite_response(invite, creator) for invite, creator in invites_with_creators
     ]
 
     return InviteListResponse(invites=invite_responses, total=len(invite_responses))

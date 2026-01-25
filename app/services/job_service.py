@@ -103,9 +103,7 @@ class JobService:
         sanitized = sanitized[:50].rstrip("-")
         return f"{sanitized}-{str(job_id)}"
 
-    async def create_job(
-        self, company_id: str | UUID, user_id: str | UUID, data: JobCreate
-    ) -> Job:
+    async def create_job(self, company_id: str | UUID, user_id: str | UUID, data: JobCreate) -> Job:
         """
         Create a new job posting.
 
@@ -244,9 +242,7 @@ class JobService:
 
         return job
 
-    async def update_job(
-        self, company_id: str | UUID, job_id: UUID, data: JobUpdate
-    ) -> Job:
+    async def update_job(self, company_id: str | UUID, job_id: UUID, data: JobUpdate) -> Job:
         """
         Update job details.
 
@@ -327,24 +323,24 @@ class JobService:
             func.count(
                 case((Application.created_at >= month_ago, Application.id), else_=None)
             ).label("month_applications"),
-            func.count(
-                case((Application.status == "applied", Application.id), else_=None)
-            ).label("applied_count"),
-            func.count(
-                case((Application.status == "screening", Application.id), else_=None)
-            ).label("screening_count"),
+            func.count(case((Application.status == "applied", Application.id), else_=None)).label(
+                "applied_count"
+            ),
+            func.count(case((Application.status == "screening", Application.id), else_=None)).label(
+                "screening_count"
+            ),
             func.count(
                 case((Application.status == "interviewing", Application.id), else_=None)
             ).label("interviewing_count"),
-            func.count(
-                case((Application.status == "offer", Application.id), else_=None)
-            ).label("offer_count"),
-            func.count(
-                case((Application.status == "hired", Application.id), else_=None)
-            ).label("hired_count"),
-            func.count(
-                case((Application.status == "rejected", Application.id), else_=None)
-            ).label("rejected_count"),
+            func.count(case((Application.status == "offer", Application.id), else_=None)).label(
+                "offer_count"
+            ),
+            func.count(case((Application.status == "hired", Application.id), else_=None)).label(
+                "hired_count"
+            ),
+            func.count(case((Application.status == "rejected", Application.id), else_=None)).label(
+                "rejected_count"
+            ),
             func.max(Application.created_at).label("latest_application_at"),
         ).where(
             Application.job_id == job_id,
@@ -655,9 +651,7 @@ class JobService:
             total_candidates += row.count
             by_status[row.status] = by_status.get(row.status, 0) + row.count
             if row.evaluation_tier:
-                by_tier[row.evaluation_tier] = (
-                    by_tier.get(row.evaluation_tier, 0) + row.count
-                )
+                by_tier[row.evaluation_tier] = by_tier.get(row.evaluation_tier, 0) + row.count
 
         return ApplicationStats(
             total_candidates=total_candidates,

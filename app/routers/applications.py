@@ -122,9 +122,7 @@ async def get_application(
     Returns full application details including job info.
     """
     service = ApplicationService(db)
-    application = await service.get_application(
-        current_user["company_id"], application_id
-    )
+    application = await service.get_application(current_user["company_id"], application_id)
 
     response_data = ApplicationDetail.model_validate(application)
     response_data.job = JobBasic(
@@ -150,9 +148,7 @@ async def get_resume_view_url(
     Returns signed URL with 1-hour expiry (inline disposition).
     """
     service = ApplicationService(db)
-    result = await service.get_resume_view_url(
-        current_user["company_id"], application_id
-    )
+    result = await service.get_resume_view_url(current_user["company_id"], application_id)
 
     return ResumeUrl(
         url=result.url,
@@ -161,9 +157,7 @@ async def get_resume_view_url(
     )
 
 
-@router.get(
-    "/{application_id}/resume/download", response_model=ResumeUrl, tags=["Applications"]
-)
+@router.get("/{application_id}/resume/download", response_model=ResumeUrl, tags=["Applications"])
 async def get_resume_download_url(
     application_id: UUID,
     current_user: dict = Depends(get_current_user),
@@ -177,9 +171,7 @@ async def get_resume_download_url(
     Returns signed URL with 1-hour expiry (attachment disposition).
     """
     service = ApplicationService(db)
-    result = await service.get_resume_download_url(
-        current_user["company_id"], application_id
-    )
+    result = await service.get_resume_download_url(current_user["company_id"], application_id)
 
     return ResumeUrl(
         url=result.url,
@@ -241,9 +233,7 @@ async def get_application_history(
     Returns list of status changes with user info and notes (newest first).
     """
     service = ApplicationService(db)
-    history = await service.get_status_history(
-        current_user["company_id"], application_id
-    )
+    history = await service.get_status_history(current_user["company_id"], application_id)
 
     history_items = [
         StatusHistoryItem(
@@ -280,9 +270,7 @@ async def get_application_scheduled_emails(
     Returns list of scheduled emails (newest first).
     """
     service = ApplicationService(db)
-    emails = await service.get_scheduled_emails(
-        current_user["company_id"], application_id
-    )
+    emails = await service.get_scheduled_emails(current_user["company_id"], application_id)
 
     email_items = [
         ScheduledEmailItem(

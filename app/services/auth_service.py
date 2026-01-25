@@ -162,7 +162,9 @@ If you didn't request this, you can safely ignore this email.
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def register(self, email: str, password: str, first_name: str, last_name: str) -> AuthResult:
+    async def register(
+        self, email: str, password: str, first_name: str, last_name: str
+    ) -> AuthResult:
         """
         Register a new user.
 
@@ -302,7 +304,9 @@ If you didn't request this, you can safely ignore this email.
             email_verified=user.email_verified,
         )
 
-        return AuthResult(user=user, company=company, access_token=access_token, expires_at=expires_at)
+        return AuthResult(
+            user=user, company=company, access_token=access_token, expires_at=expires_at
+        )
 
     async def verify_email(self, token: str) -> tuple[bool, str]:
         """

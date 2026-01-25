@@ -146,9 +146,7 @@ class ApplicationService:
             screening_answers=parsed_answers,
         )
 
-    async def get_application(
-        self, company_id: str | UUID, application_id: UUID
-    ) -> Application:
+    async def get_application(self, company_id: str | UUID, application_id: UUID) -> Application:
         """
         Get application details with job relationship.
 
@@ -173,9 +171,7 @@ class ApplicationService:
         application = result.scalar_one_or_none()
 
         if not application:
-            raise NotFoundError(
-                message="Application not found", code="application_not_found"
-            )
+            raise NotFoundError(message="Application not found", code="application_not_found")
 
         return application
 
@@ -316,9 +312,7 @@ class ApplicationService:
         application = result.scalar_one_or_none()
 
         if not application:
-            raise NotFoundError(
-                message="Application not found", code="application_not_found"
-            )
+            raise NotFoundError(message="Application not found", code="application_not_found")
 
         old_status = application.status
 
@@ -390,9 +384,7 @@ class ApplicationService:
             )
         )
         if not app_result.scalar_one_or_none():
-            raise NotFoundError(
-                message="Application not found", code="application_not_found"
-            )
+            raise NotFoundError(message="Application not found", code="application_not_found")
 
         # Fetch history
         history_result = await self.db.execute(
@@ -409,9 +401,7 @@ class ApplicationService:
                 from_status=entry.from_status,
                 to_status=entry.to_status,
                 changed_by_id=entry.changed_by_user.id if entry.changed_by_user else None,
-                changed_by_name=entry.changed_by_user.full_name
-                if entry.changed_by_user
-                else None,
+                changed_by_name=entry.changed_by_user.full_name if entry.changed_by_user else None,
                 notes=entry.notes,
                 created_at=entry.created_at,
             )
@@ -442,9 +432,7 @@ class ApplicationService:
             )
         )
         if not app_result.scalar_one_or_none():
-            raise NotFoundError(
-                message="Application not found", code="application_not_found"
-            )
+            raise NotFoundError(message="Application not found", code="application_not_found")
 
         # Fetch scheduled emails
         emails_result = await self.db.execute(
@@ -658,8 +646,6 @@ class ApplicationService:
         application = result.scalar_one_or_none()
 
         if not application:
-            raise NotFoundError(
-                message="Application not found", code="application_not_found"
-            )
+            raise NotFoundError(message="Application not found", code="application_not_found")
 
         return application

@@ -36,9 +36,7 @@ class CompanyService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_company(
-        self, user_company_id: str | UUID | None, company_id: UUID
-    ) -> Company:
+    async def get_company(self, user_company_id: str | UUID | None, company_id: UUID) -> Company:
         """
         Get company by ID with access control.
 
@@ -138,9 +136,7 @@ class CompanyService:
                 code="slug_taken",
             )
 
-    async def complete_onboarding(
-        self, user_id: UUID, data: OnboardingRequest
-    ) -> OnboardingResult:
+    async def complete_onboarding(self, user_id: UUID, data: OnboardingRequest) -> OnboardingResult:
         """
         Complete organization onboarding.
 
@@ -242,9 +238,7 @@ class CompanyService:
         company = result.scalar_one_or_none()
 
         if not company:
-            raise NotFoundError(
-                message="Organization not found", code="company_not_found"
-            )
+            raise NotFoundError(message="Organization not found", code="company_not_found")
 
         if company.onboarding_completed:
             raise ValidationError(

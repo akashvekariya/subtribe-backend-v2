@@ -200,9 +200,7 @@ async def save_job_calibration(
     - Stores calibration_summary, evaluation_framework, and sets calibrated_at
     """
     service = JobService(db)
-    job = await service.save_calibration(
-        current_user["company_id"], job_id, calibration_data
-    )
+    job = await service.save_calibration(current_user["company_id"], job_id, calibration_data)
 
     # Auto-trigger evaluation for existing unevaluated applications
     triggered_count = await trigger_evaluation_for_job(
