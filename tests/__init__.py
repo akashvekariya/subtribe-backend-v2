@@ -1,1 +1,1 @@
-"""Test suite for Subtribe ATS Backend."""
+"""Test suite for Subtribe Backend."""

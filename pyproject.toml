@@ -39,7 +39,6 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
 ignore = [
     "E501",  # Line too long (handled by formatter)
     "B008",  # Do not perform function calls in argument defaults (FastAPI uses this pattern)
-    "UP007", # Use X | Y for type annotations (Optional is clearer)
     "N818",  # Exception name should end with Error (AppException is intentional)
     "E402",  # Module level import not at top (intentional for Alembic migrations)
     "SIM105", # Use contextlib.suppress - try-except-pass is clearer for cleanup
@@ -54,6 +53,8 @@ unfixable = []
 "tests/**/*.py" = ["E501", "F401", "F811"]
 # __init__.py files often have unused imports (re-exports)
 "__init__.py" = ["F401"]
+# Schema files can use camelCase to match frontend API expectations
+"app/schemas/*.py" = ["N815"]
 
 [tool.ruff.format]
 # Use single quotes instead of double quotes
@@ -105,7 +106,6 @@ module = [
     "google.cloud.*",
     "sqlalchemy.*",
     "alembic.*",
-    "passlib.*",
     "jose.*",
 ]
 ignore_missing_imports = true

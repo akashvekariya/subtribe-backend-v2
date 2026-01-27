@@ -6,15 +6,20 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import TIMESTAMP, Boolean, CheckConstraint, String, text
+from sqlalchemy import TIMESTAMP, Boolean, CheckConstraint, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.ai_resume_eval_batch import AIResumeEvalBatch
     from app.models.application import Application
+    from app.models.bulk_upload_batch import BulkUploadBatch
+    from app.models.email_template import EmailTemplate
+    from app.models.invite import Invite
     from app.models.job import Job
+    from app.models.scheduled_email import ScheduledEmail
     from app.models.user import User
 
 
@@ -56,6 +61,18 @@ class Company(Base):
         Boolean, server_default=text("true"), default=True, nullable=False
     )
 
+    # AI Candidate Evaluation Settings
+    max_concurrent_ai_evaluations: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Max concurrent AI candidate evaluations. If null, uses plan default.",
+    )
+
+    # Onboarding Status
+    onboarding_completed: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), default=False, nullable=False
+    )
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
@@ -82,9 +99,27 @@ class Company(Base):
     applications: Mapped[list[Application]] = relationship(
         "Application", back_populates="company", cascade="all, delete-orphan"
     )
+    email_templates: Mapped[list[EmailTemplate]] = relationship(
+        "EmailTemplate", back_populates="company", cascade="all, delete-orphan"
+    )
+    scheduled_emails: Mapped[list[ScheduledEmail]] = relationship(
+        "ScheduledEmail", back_populates="company", cascade="all, delete-orphan"
+    )
+    invites: Mapped[list[Invite]] = relationship(
+        "Invite", back_populates="company", cascade="all, delete-orphan"
+    )
+    ai_resume_eval_batches: Mapped[list[AIResumeEvalBatch]] = relationship(
+        "AIResumeEvalBatch", back_populates="company", cascade="all, delete-orphan"
+    )
+    bulk_upload_batches: Mapped[list[BulkUploadBatch]] = relationship(
+        "BulkUploadBatch", back_populates="company", cascade="all, delete-orphan"
+    )
 
     # Constraints
     __table_args__ = (CheckConstraint("slug ~ '^[a-z0-9-]+$'", name="slug_format"),)
 
     def __repr__(self) -> str:
-        return f"<Company(id={self.id}, name={self.name}, slug={self.slug}, website_url={self.website_url})>"
+        return (
+            f"<Company(id={self.id}, name={self.name}, "
+            f"slug={self.slug}, website_url={self.website_url})>"
+        )

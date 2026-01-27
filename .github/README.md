@@ -142,7 +142,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 gcloud artifacts repositories create subtribe-ats-backend \
   --repository-format=docker \
   --location=asia-south1 \
-  --description="Docker images for Subtribe ATS Backend"
+  --description="Docker images for Subtribe Backend"
 ```
 
 ### 4. Export Service Account Key

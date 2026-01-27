@@ -16,7 +16,7 @@ permissions:
 env:
   # GCP Configuration
   PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-  REGION: asia-south1 # Mumbai region
+  REGION: asia-east1 # Taiwan region (supports custom domain mappings)
   SERVICE_NAME: subtribe-backend-staging
   ARTIFACT_REGISTRY_REPO: subtribe # Shared repo for all services
 
@@ -42,13 +42,20 @@ jobs:
           python-version: "3.13"
           cache: "pip"
 
-      # Step 3: Install dependencies
+      # Step 3: Configure git credentials for private subtribe-ai repo
+      - name: Configure git credentials
+        run: |
+          git config --global url."https://${{ secrets.SUBTRIBE_AI_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        env:
+          SUBTRIBE_AI_TOKEN: ${{ secrets.SUBTRIBE_AI_TOKEN }}
+
+      # Step 4: Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Step 4: Run Ruff linter (check for errors)
+      # Step 5: Run Ruff linter (check for errors)
       - name: Lint with Ruff
         run: |
           echo "🔍 Running Ruff linter..."
@@ -157,6 +164,7 @@ jobs:
           echo "🔨 Building Docker image for Staging..."
           echo "📦 Branch Tag: ${{ steps.branch_name.outputs.sanitized_branch }}"
           docker build \
+            --build-arg GITHUB_TOKEN=${{ secrets.SUBTRIBE_AI_TOKEN }} \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:${{ steps.branch_name.outputs.sanitized_branch }} \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest \
@@ -194,11 +202,38 @@ jobs:
           SUPABASE_JWT_SECRET: "${{ secrets.SUPABASE_JWT_SECRET }}"
           GCS_BUCKET_NAME: "${{ vars.GCS_BUCKET_NAME }}"
           GCS_PROJECT_ID: "${{ vars.GCS_PROJECT_ID }}"
+          # GCS Service Account credentials (mounted secret file)
+          GOOGLE_APPLICATION_CREDENTIALS: "/secrets/gcs-sa-key.json"
           # The complex CORS value is passed here as a string value in YAML.
           CORS_ALLOWED_ORIGINS: "${{ vars.ALLOWED_ORIGINS }}"
+          # Email Service Configuration
+          EMAIL_ENABLED: "${{ vars.EMAIL_ENABLED }}"
+          EMAIL_PROVIDER: "${{ vars.EMAIL_PROVIDER }}"
+          SENDGRID_API_KEY: "${{ secrets.SENDGRID_API_KEY }}"
+          SENDGRID_SANDBOX_MODE: "${{ vars.SENDGRID_SANDBOX_MODE }}"
+          EMAIL_FROM_ADDRESS: "${{ vars.EMAIL_FROM_ADDRESS }}"
+          EMAIL_FROM_NAME: "${{ vars.EMAIL_FROM_NAME }}"
+          # Cloud Tasks Configuration (for scheduled email delivery)
+          GCP_CLOUD_TASKS_QUEUE: "${{ vars.GCP_CLOUD_TASKS_QUEUE }}"
+          GCP_CLOUD_TASKS_LOCATION: "${{ env.REGION }}"
+          BACKEND_URL: "${{ vars.BACKEND_URL }}"
+          # Dashboard URL (for email links - invites, verification)
+          DASHBOARD_URL: "${{ vars.DASHBOARD_URL }}"
+          # AI Resume Evaluation Service URL (for Cloud Tasks callbacks)
+          AI_RESUME_EVAL_SERVICE_URL: "${{ vars.BACKEND_URL }}"
+          # Google API Key (for Gemini AI - resume parsing and evaluation)
+          GOOGLE_API_KEY: "${{ secrets.GOOGLE_API_KEY }}"
+          # Cookie Configuration (HTTP-only cookie authentication)
+          COOKIE_SECURE: "true"
+          COOKIE_SAMESITE: "Lax"
+          COOKIE_DOMAIN: ".thesubtribe.com"
+          COOKIE_MAX_AGE: "2592000"
+          # Super Admin Configuration
+          SUPER_ADMIN_EMAILS: "${{ vars.SUPER_ADMIN_EMAILS }}"
           EOF
 
           # 2. Deploy using the environment variables file
+          # Mount GCS service account key from Secret Manager for signed URL generation
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:$DEPLOY_TAG \
             --region=${{ env.REGION }} \
@@ -206,6 +241,7 @@ jobs:
             --platform=managed \
             --allow-unauthenticated \
             --env-vars-file=env-vars.yaml \
+            --set-secrets=/secrets/gcs-sa-key.json=gcs-sa-key:latest \
             --memory=512Mi \
             --cpu=1 \
             --timeout=60s \

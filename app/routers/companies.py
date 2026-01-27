@@ -2,15 +2,19 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.dependencies import get_current_user
-from app.exceptions import ForbiddenError, NotFoundError
-from app.models.company import Company
-from app.schemas.company import CompanyResponse, CompanyUpdate
+from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.core.security import set_auth_cookie
+from app.schemas.company import (
+    CompanyResponse,
+    CompanyUpdate,
+    OnboardingRequest,
+    OnboardingResponse,
+)
+from app.services.company_service import CompanyService
 
 router = APIRouter()
 
@@ -28,21 +32,8 @@ async def get_company(
 
     **Returns**: Company profile including invite_code (for team onboarding)
     """
-    # Check if user belongs to this company (multi-tenant security)
-    if str(current_user["company_id"]) != str(company_id):
-        raise ForbiddenError(
-            message="You don't have access to this company", code="company_access_denied"
-        )
-
-    # Fetch company
-    stmt = select(Company).where(Company.id == company_id)
-    result = await db.execute(stmt)
-    company = result.scalar_one_or_none()
-
-    if not company:
-        raise NotFoundError(message="Company not found", code="company_not_found")
-
-    return company
+    service = CompanyService(db)
+    return await service.get_company(current_user["company_id"], company_id)
 
 
 @router.patch("/{company_id}", response_model=CompanyResponse, tags=["Companies"])
@@ -63,27 +54,47 @@ async def update_company(
 
     **Note**: These fields are displayed to candidates on public job pages
     """
-    # Check if user belongs to this company (multi-tenant security)
-    if str(current_user["company_id"]) != str(company_id):
-        raise ForbiddenError(
-            message="You don't have access to this company", code="company_access_denied"
-        )
+    service = CompanyService(db)
+    return await service.update_company(current_user["company_id"], company_id, data)
 
-    # Fetch company
-    stmt = select(Company).where(Company.id == company_id)
-    result = await db.execute(stmt)
-    company = result.scalar_one_or_none()
 
-    if not company:
-        raise NotFoundError(message="Company not found", code="company_not_found")
+@router.post(
+    "/onboarding",
+    response_model=OnboardingResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Companies"],
+)
+async def complete_onboarding(
+    data: OnboardingRequest,
+    response: Response,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Complete organization onboarding.
 
-    # Update fields (only non-None values)
-    update_data = data.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(company, field, value)
+    **Auth**: Required
 
-    # Commit changes
-    await db.commit()
-    await db.refresh(company)
+    For org_creator users (pending_onboarding=True):
+    - Creates new company with provided details
+    - Assigns company to user
+    - Sets pending_onboarding=False
 
-    return company
+    For existing company users:
+    - Updates company details
+    - Marks onboarding as complete
+    """
+    user_id = UUID(current_user["user_id"])
+    service = CompanyService(db)
+
+    result = await service.complete_onboarding(user_id, data)
+
+    # Set updated cookie if new token was generated (org_creator flow)
+    if result.access_token:
+        set_auth_cookie(response, result.access_token)
+
+    return OnboardingResponse(
+        success=True,
+        company=result.company,
+        message=result.message,
+    )

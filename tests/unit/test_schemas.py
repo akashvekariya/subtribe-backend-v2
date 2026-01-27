@@ -23,12 +23,10 @@ class TestAuthSchemas:
             password="SecurePass123!",
             first_name="Test",
             last_name="User",
-            company_code="ACME-x7k9p2",
         )
         assert data.email == "test@example.com"
         assert data.first_name == "Test"
         assert data.last_name == "User"
-        assert data.company_code == "ACME-x7k9p2"
 
     def test_user_register_invalid_email(self):
         """Test registration with invalid email."""
@@ -38,7 +36,6 @@ class TestAuthSchemas:
                 password="SecurePass123!",
                 first_name="Test",
                 last_name="User",
-                company_code="ACME-x7k9p2",
             )
         assert "email" in str(exc_info.value).lower()
 
@@ -164,8 +161,17 @@ class TestApplicationSchemas:
             ApplicationStatusUpdate(status="invalid_status", notes="Some notes")
         assert "status" in str(exc_info.value).lower()
 
-    def test_application_status_update_empty_notes(self):
-        """Test application update requires notes."""
-        with pytest.raises(ValidationError):
-            ApplicationStatusUpdate(status="screening", notes="")
-        # Should fail on empty notes validation (min_length=1 and strip check)
+    def test_application_status_update_without_notes(self):
+        """Test application update allows optional notes."""
+        # Notes are now optional - both None and empty string should work
+        data = ApplicationStatusUpdate(status="screening", notes=None)
+        assert data.status == "screening"
+        assert data.notes is None
+
+        # Empty string gets cleaned to None
+        data2 = ApplicationStatusUpdate(status="screening", notes="")
+        assert data2.notes is None
+
+        # Can omit notes entirely
+        data3 = ApplicationStatusUpdate(status="screening")
+        assert data3.notes is None
