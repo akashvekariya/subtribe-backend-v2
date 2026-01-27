@@ -27,7 +27,7 @@ RUN set -e && \
         exit 1; \
     fi && \
     echo "Installing baml-py to get baml-cli..." && \
-    pip install --no-cache-dir baml-py==0.216.0 && \
+    pip install --no-cache-dir baml-py==0.217.0 && \
     echo "Cloning subtribe-ai repository..." && \
     git clone https://${GITHUB_TOKEN}@github.com/thesubtribe/subtribe-ai.git /tmp/subtribe-ai && \
     cd /tmp/subtribe-ai && \
