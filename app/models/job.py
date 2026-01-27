@@ -10,10 +10,12 @@ from sqlalchemy import TIMESTAMP, CheckConstraint, ForeignKey, Index, Integer, S
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.ai_resume_eval_batch import AIResumeEvalBatch
     from app.models.application import Application
+    from app.models.bulk_upload_batch import BulkUploadBatch
     from app.models.company import Company
     from app.models.user import User
 
@@ -87,6 +89,17 @@ class Job(Base):
         Integer, server_default=text("0"), default=0, nullable=False
     )
 
+    # AI Calibration
+    calibration_summary: Mapped[dict | None] = mapped_column(
+        JSONB, nullable=True, comment="Calibration decisions made by recruiter"
+    )
+    evaluation_framework: Mapped[dict | None] = mapped_column(
+        JSONB, nullable=True, comment="AI-generated evaluation framework for scoring candidates"
+    )
+    calibrated_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True, comment="When calibration was completed"
+    )
+
     # Timestamps
     published_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
@@ -112,6 +125,12 @@ class Job(Base):
     )
     applications: Mapped[list[Application]] = relationship(
         "Application", back_populates="job", cascade="all, delete-orphan"
+    )
+    ai_resume_eval_batches: Mapped[list[AIResumeEvalBatch]] = relationship(
+        "AIResumeEvalBatch", back_populates="job", cascade="all, delete-orphan"
+    )
+    bulk_upload_batches: Mapped[list[BulkUploadBatch]] = relationship(
+        "BulkUploadBatch", back_populates="job", cascade="all, delete-orphan"
     )
 
     # Constraints & Indexes

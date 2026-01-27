@@ -6,13 +6,46 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
-from app.config import settings
-from app.exceptions import register_exception_handlers
+from app.core.config import settings
+from app.core.exceptions import register_exception_handlers
 from app.logging import LoggingMiddleware, setup_logging
-from app.routers import applications, auth, companies, dashboard, emails, invites, jobs
+from app.routers import (
+    ai,
+    ai_resume_eval,
+    applications,
+    auth,
+    bulk_upload,
+    companies,
+    dashboard,
+    emails,
+    invites,
+    jobs,
+)
+from app.routers.v1 import applications as v1_applications
 
 logger = logging.getLogger(__name__)
+
+
+def _configure_subtribe_ai():
+    """Configure the subtribe-ai package with settings from backend config."""
+    try:
+        import subtribe_ai
+
+        subtribe_ai.configure(
+            google_api_key=settings.subtribe_ai_google_api_key,
+            openai_api_key=settings.subtribe_ai_openai_api_key,
+            default_model=settings.subtribe_ai_default_model,
+            langfuse_enabled=settings.subtribe_ai_langfuse_enabled,
+            langfuse_public_key=settings.subtribe_ai_langfuse_public_key,
+            langfuse_secret_key=settings.subtribe_ai_langfuse_secret_key,
+        )
+        logger.info("subtribe-ai configured successfully")
+    except ImportError:
+        logger.warning("subtribe-ai not installed, AI features will be unavailable")
+    except Exception as e:
+        logger.error(f"Failed to configure subtribe-ai: {e}")
 
 
 @asynccontextmanager
@@ -30,6 +63,9 @@ async def lifespan(app: FastAPI):
         log_level=settings.log_level,
         third_party_log_level=settings.third_party_log_level,
     )
+
+    # Configure subtribe-ai package
+    _configure_subtribe_ai()
 
     logger.info(
         "Application starting",
@@ -111,6 +147,9 @@ app.add_middleware(
     max_age=3600,  # Cache CORS preflight for 1 hour (reduces OPTIONS spam)
 )
 
+# 3. GZip compression for responses > 500 bytes
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # Exception handlers
 register_exception_handlers(app)
 
@@ -121,14 +160,39 @@ async def health_check():
     return {"status": "healthy", "environment": settings.environment}
 
 
-app.include_router(auth.router, prefix="/auth")
-app.include_router(invites.router, prefix="/invites")
-app.include_router(companies.router, prefix="/companies")
-app.include_router(dashboard.router, prefix="/dashboard")
-app.include_router(jobs.router, prefix="/jobs")
-app.include_router(jobs.public_router, prefix="/public/jobs")
-app.include_router(applications.public_router, prefix="/public")
-app.include_router(applications.router, prefix="/applications")
-app.include_router(emails.internal_router, prefix="/internal/emails")
-app.include_router(emails.email_router, prefix="/emails")
-app.include_router(emails.router, prefix="/emails")
+# =============================================================================
+# API v1 Routes (Authenticated)
+# =============================================================================
+app.include_router(auth.router, prefix="/api/v1/auth")
+app.include_router(invites.router, prefix="/api/v1/invites")
+app.include_router(companies.router, prefix="/api/v1/companies")
+app.include_router(dashboard.router, prefix="/api/v1/dashboard")
+app.include_router(jobs.router, prefix="/api/v1/jobs")
+app.include_router(applications.router, prefix="/api/v1/applications")
+app.include_router(emails.email_router, prefix="/api/v1/emails")
+app.include_router(emails.router, prefix="/api/v1/email-templates")
+app.include_router(ai.router, prefix="/api/v1/ai")
+
+# AI Resume Evaluation routes (under /api/v1)
+# Note: These have paths like /jobs/{id}/start, /batches/*, /internal/*
+app.include_router(ai_resume_eval.router, prefix="/api/v1")
+
+# Bulk Upload routes (under /api/v1)
+# Protected: /bulk-uploads/jobs/{id}/upload, /bulk-uploads/{id}
+# Internal: /bulk-uploads/internal/process/{task_id}
+app.include_router(bulk_upload.router, prefix="/api/v1")
+
+# V1 Applications router (under /api/v1)
+# Note: Has /jobs/{slug}/apply and /applications/{id}/resume
+app.include_router(v1_applications.router, prefix="/api/v1")
+
+# =============================================================================
+# Public Routes (No Authentication)
+# =============================================================================
+app.include_router(jobs.public_router, prefix="/api/public/jobs")
+app.include_router(applications.public_router, prefix="/api/public")
+
+# =============================================================================
+# Internal Routes (For Cloud Tasks, Webhooks)
+# =============================================================================
+app.include_router(emails.internal_router, prefix="/api/internal/emails")

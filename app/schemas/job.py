@@ -317,6 +317,9 @@ class JobResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Calibration
+    calibrated_at: datetime | None = None
+
     # Relationships
     creator: JobCreatorResponse | None = None
     company: CompanyBriefResponse | None = None
@@ -341,6 +344,7 @@ class JobListItem(BaseModel):
 
     published_at: datetime | None = None
     created_at: datetime
+    calibrated_at: datetime | None = None
 
 
 class JobListResponse(BaseModel):
@@ -472,3 +476,41 @@ class JobStatsResponse(BaseModel):
     activity: JobActivityStats
     pipeline: JobPipelineStats | None = None
     generated_at: datetime
+
+
+# ============================================================================
+# Calibration Schemas
+# ============================================================================
+
+
+class CalibrationSaveRequest(BaseModel):
+    """Request schema for saving job calibration results."""
+
+    calibration_summary: dict = Field(
+        ..., description="Calibration decisions made by recruiter during AI calibration"
+    )
+    evaluation_framework: dict = Field(
+        ..., description="AI-generated evaluation framework for scoring candidates"
+    )
+
+
+class CalibrationResponse(BaseModel):
+    """Response schema for calibration data."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    calibration_summary: dict | None = None
+    evaluation_framework: dict | None = None
+    calibrated_at: datetime | None = None
+
+
+class JobCalibrationResponse(BaseModel):
+    """Response after saving calibration."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    calibration_summary: dict | None = None
+    evaluation_framework: dict | None = None
+    calibrated_at: datetime | None = None
+    message: str = "Calibration saved successfully"

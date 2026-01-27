@@ -74,6 +74,24 @@ class Settings(BaseSettings):
     log_response_body: bool = True  # Log response bodies (can override per route)
     third_party_log_level: str = "WARNING"  # Log level for ALL third-party libraries
 
+    # AI Resume Evaluation
+    ai_resume_eval_service_url: str = "http://localhost:8000"
+
+    # AI Configuration (subtribe-ai package)
+    # These env vars use SUBTRIBE_AI_ prefix and are loaded by the subtribe-ai package
+    subtribe_ai_google_api_key: str = ""
+    subtribe_ai_openai_api_key: str = ""
+    subtribe_ai_default_model: str = "gemini-2.0-flash"
+    subtribe_ai_langfuse_enabled: bool = False
+    subtribe_ai_langfuse_public_key: str = ""
+    subtribe_ai_langfuse_secret_key: str = ""
+
+    # Bulk Upload Configuration
+    bulk_upload_concurrent_per_batch: int = 5  # Max concurrent tasks per batch
+    bulk_upload_global_max_concurrent: int = 15  # Global max concurrent tasks
+    bulk_upload_task_queue_name: str = "bulk-upload-tasks"  # Cloud Tasks queue name
+    bulk_upload_task_stagger_seconds: int = 2  # Seconds between task creation
+
     model_config = SettingsConfigDict(
         env_file=f".env.{os.getenv('ENVIRONMENT', 'development')}",
         env_file_encoding="utf-8",

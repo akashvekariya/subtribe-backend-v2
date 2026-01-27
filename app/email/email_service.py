@@ -10,7 +10,7 @@ import pytz
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
+from app.core.config import settings
 from app.email.default_templates import get_default_template, get_variable_fallbacks
 from app.email.providers import (
     EmailMessage,

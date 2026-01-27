@@ -69,7 +69,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppException)
     async def app_exception_handler(request: Request, exc: AppException):
         # Lazy import to avoid circular dependency
-        from app.dependencies import get_correlation_id
+        from app.core.dependencies import get_correlation_id
 
         # Log application exception
         logger.warning(
@@ -101,7 +101,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
         # Lazy import to avoid circular dependency
-        from app.dependencies import get_correlation_id
+        from app.core.dependencies import get_correlation_id
 
         # Clean up errors to make them JSON serializable
         errors = []
@@ -149,7 +149,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         in the endpoint/service layer.
         """
         # Lazy import to avoid circular dependency
-        from app.dependencies import get_correlation_id
+        from app.core.dependencies import get_correlation_id
 
         raw_error = str(exc.orig) if hasattr(exc, "orig") else str(exc)
 
@@ -185,7 +185,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception):
         # Lazy import to avoid circular dependency
-        from app.dependencies import get_correlation_id
+        from app.core.dependencies import get_correlation_id
 
         # Log unexpected exception with full traceback
         logger.error(

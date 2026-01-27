@@ -20,7 +20,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import StreamingResponse
 
-from app.dependencies import set_correlation_id
+from app.core.dependencies import set_correlation_id
 from app.logging.constants import ROUTE_LOGGING_RULES
 from app.logging.utils import (
     determine_log_level,

@@ -53,6 +53,8 @@ unfixable = []
 "tests/**/*.py" = ["E501", "F401", "F811"]
 # __init__.py files often have unused imports (re-exports)
 "__init__.py" = ["F401"]
+# Schema files can use camelCase to match frontend API expectations
+"app/schemas/*.py" = ["N815"]
 
 [tool.ruff.format]
 # Use single quotes instead of double quotes
