@@ -125,6 +125,13 @@ class Application(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
 
+    # Processing Status (tracks data readiness, not hiring pipeline stage)
+    # - "complete": Data ready, visible in candidate list (default)
+    # - "processing": Being processed (e.g., bulk upload AI parsing)
+    processing_status: Mapped[str] = mapped_column(
+        String(50), server_default=text("'complete'"), default="complete", nullable=False
+    )
+
     # Timestamps
     applied_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
@@ -163,12 +170,18 @@ class Application(Base):
             "status IN ('applied', 'screening', 'interviewing', 'offer', 'hired', 'rejected')",
             name="valid_application_status",
         ),
+        CheckConstraint(
+            "processing_status IN ('complete', 'processing')",
+            name="valid_application_processing_status",
+        ),
         # Performance index for GET /jobs/{job_id}/applications endpoint
         Index("idx_applications_job_applied", "job_id", "applied_at"),
         # Composite index for status filtering (common recruiter workflow)
         Index("idx_applications_job_status_applied", "job_id", "status", "applied_at"),
         # Index for evaluation queries (sorting by score within a job)
         Index("idx_applications_job_eval_score", "job_id", "evaluation_score"),
+        # Index for filtering by processing status (bulk upload visibility)
+        Index("idx_applications_processing_status", "job_id", "processing_status"),
     )
 
     def __repr__(self) -> str:

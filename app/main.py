@@ -16,6 +16,7 @@ from app.routers import (
     ai_resume_eval,
     applications,
     auth,
+    bulk_upload,
     companies,
     dashboard,
     emails,
@@ -175,6 +176,11 @@ app.include_router(ai.router, prefix="/api/v1/ai")
 # AI Resume Evaluation routes (under /api/v1)
 # Note: These have paths like /jobs/{id}/start, /batches/*, /internal/*
 app.include_router(ai_resume_eval.router, prefix="/api/v1")
+
+# Bulk Upload routes (under /api/v1)
+# Protected: /bulk-uploads/jobs/{id}/upload, /bulk-uploads/{id}
+# Internal: /bulk-uploads/internal/process/{task_id}
+app.include_router(bulk_upload.router, prefix="/api/v1")
 
 # V1 Applications router (under /api/v1)
 # Note: Has /jobs/{slug}/apply and /applications/{id}/resume

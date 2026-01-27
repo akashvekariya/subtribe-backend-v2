@@ -24,7 +24,7 @@ class OtherLink(BaseModel):
 class PersonalInfo(BaseModel):
     """Candidate's personal/contact information."""
 
-    full_name: str
+    full_name: str | None = None
     email: str | None = None
     phone: str | None = None
     location: str | None = None

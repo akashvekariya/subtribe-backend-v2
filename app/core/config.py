@@ -86,6 +86,12 @@ class Settings(BaseSettings):
     subtribe_ai_langfuse_public_key: str = ""
     subtribe_ai_langfuse_secret_key: str = ""
 
+    # Bulk Upload Configuration
+    bulk_upload_concurrent_per_batch: int = 5  # Max concurrent tasks per batch
+    bulk_upload_global_max_concurrent: int = 15  # Global max concurrent tasks
+    bulk_upload_task_queue_name: str = "bulk-upload-tasks"  # Cloud Tasks queue name
+    bulk_upload_task_stagger_seconds: int = 2  # Seconds between task creation
+
     model_config = SettingsConfigDict(
         env_file=f".env.{os.getenv('ENVIRONMENT', 'development')}",
         env_file_encoding="utf-8",

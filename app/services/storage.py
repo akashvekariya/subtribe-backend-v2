@@ -326,6 +326,193 @@ class StorageService:
         """
         return self.generate_signed_url(gcs_uri, expiration_minutes=60, disposition="attachment")
 
+    def upload_temp_zip(self, file: BinaryIO, company_id: str, batch_id: str) -> str:
+        """
+        Upload ZIP file to temporary location for bulk upload processing.
+
+        Args:
+            file: File-like object containing the ZIP
+            company_id: Company UUID
+            batch_id: Bulk upload batch UUID
+
+        Returns:
+            GCS URI (gs://bucket-name/temp/company_id/bulk_uploads/batch_id.zip)
+
+        Raises:
+            GoogleCloudError: If upload fails
+        """
+        start_time = time.time()
+        try:
+            path = f"temp/{company_id}/bulk_uploads/{batch_id}.zip"
+            blob = self.bucket.blob(path)
+            blob.upload_from_file(file, content_type="application/zip", timeout=300)
+
+            duration_ms = int((time.time() - start_time) * 1000)
+            gcs_uri = f"gs://{self.bucket.name}/{path}"
+
+            logger.info(
+                "Temp ZIP uploaded to GCS",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "temp_zip_upload",
+                    "duration_ms": duration_ms,
+                    "success": True,
+                    "gcs_uri": gcs_uri,
+                    "company_id": company_id,
+                    "batch_id": batch_id,
+                },
+            )
+
+            return gcs_uri
+
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            logger.error(
+                "Failed to upload temp ZIP to GCS",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "temp_zip_upload",
+                    "duration_ms": duration_ms,
+                    "success": False,
+                    "error": str(e),
+                    "company_id": company_id,
+                    "batch_id": batch_id,
+                },
+                exc_info=True,
+            )
+            raise GoogleCloudError(f"Failed to upload temp ZIP: {str(e)}") from e
+
+    def upload_file_bytes(
+        self,
+        content: bytes,
+        path: str,
+        content_type: str = "application/pdf",
+    ) -> str:
+        """
+        Upload file bytes to a specific GCS path.
+
+        Args:
+            content: File contents as bytes
+            path: Full GCS path (without bucket prefix)
+            content_type: MIME type
+
+        Returns:
+            GCS URI (gs://bucket-name/path)
+
+        Raises:
+            GoogleCloudError: If upload fails
+        """
+        start_time = time.time()
+        try:
+            blob = self.bucket.blob(path)
+            blob.upload_from_string(content, content_type=content_type, timeout=60)
+
+            duration_ms = int((time.time() - start_time) * 1000)
+            gcs_uri = f"gs://{self.bucket.name}/{path}"
+
+            logger.info(
+                "File bytes uploaded to GCS",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "file_bytes_upload",
+                    "duration_ms": duration_ms,
+                    "success": True,
+                    "gcs_uri": gcs_uri,
+                    "size_bytes": len(content),
+                },
+            )
+
+            return gcs_uri
+
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            logger.error(
+                "Failed to upload file bytes to GCS",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "file_bytes_upload",
+                    "duration_ms": duration_ms,
+                    "success": False,
+                    "error": str(e),
+                    "path": path,
+                },
+                exc_info=True,
+            )
+            raise GoogleCloudError(f"Failed to upload file: {str(e)}") from e
+
+    def delete_file(self, gcs_uri: str) -> bool:
+        """
+        Delete file from GCS.
+
+        Args:
+            gcs_uri: GCS URI (gs://bucket/path/to/file)
+
+        Returns:
+            True if deleted successfully
+
+        Raises:
+            GoogleCloudError: If deletion fails
+        """
+        start_time = time.time()
+        try:
+            # Parse bucket and path from GCS URI
+            if not gcs_uri.startswith("gs://"):
+                raise ValueError(f"Invalid GCS URI format: {gcs_uri}")
+
+            uri_without_prefix = gcs_uri[5:]  # Remove "gs://"
+            parts = uri_without_prefix.split("/", 1)
+            if len(parts) != 2:
+                raise ValueError(f"Invalid GCS URI format: {gcs_uri}")
+
+            bucket_name = parts[0]
+            path = parts[1]
+
+            bucket = self.client.bucket(bucket_name)
+            blob = bucket.blob(path)
+            blob.delete(timeout=30)
+
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            logger.info(
+                "File deleted from GCS",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "delete_file",
+                    "duration_ms": duration_ms,
+                    "success": True,
+                    "gcs_uri": gcs_uri,
+                },
+            )
+            return True
+
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            logger.error(
+                "Failed to delete file from GCS",
+                extra={
+                    "correlation_id": get_correlation_id(),
+                    "event_type": "external_service",
+                    "service": "gcs",
+                    "operation": "delete_file",
+                    "duration_ms": duration_ms,
+                    "success": False,
+                    "gcs_uri": gcs_uri,
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
+            raise GoogleCloudError(f"Failed to delete file: {str(e)}") from e
+
     def download_file(self, gcs_uri: str) -> bytes:
         """
         Download file contents from GCS.

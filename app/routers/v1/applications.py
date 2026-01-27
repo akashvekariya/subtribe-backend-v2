@@ -73,7 +73,7 @@ def _transform_resume_data(parsed_json: dict[str, Any] | None) -> ResumeData | N
             other_links.append(OtherLink(url=link))
 
     personal_info = PersonalInfo(
-        full_name=pi.get("full_name", ""),
+        full_name=pi.get("full_name"),
         email=pi.get("email"),
         phone=pi.get("phone"),
         location=pi.get("location"),

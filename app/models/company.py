@@ -15,6 +15,7 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.ai_resume_eval_batch import AIResumeEvalBatch
     from app.models.application import Application
+    from app.models.bulk_upload_batch import BulkUploadBatch
     from app.models.email_template import EmailTemplate
     from app.models.invite import Invite
     from app.models.job import Job
@@ -109,6 +110,9 @@ class Company(Base):
     )
     ai_resume_eval_batches: Mapped[list[AIResumeEvalBatch]] = relationship(
         "AIResumeEvalBatch", back_populates="company", cascade="all, delete-orphan"
+    )
+    bulk_upload_batches: Mapped[list[BulkUploadBatch]] = relationship(
+        "BulkUploadBatch", back_populates="company", cascade="all, delete-orphan"
     )
 
     # Constraints
