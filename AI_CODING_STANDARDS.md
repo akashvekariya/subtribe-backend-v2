@@ -850,4 +850,4 @@ git log --oneline -5                       # Recent commits
 
 **Last Updated**: 2025-10-29
 **Version**: 1.1 (Added Communication Standards)
-**Applies to**: Subtribe ATS Backend (FastAPI + SQLAlchemy + PostgreSQL)
+**Applies to**: Subtribe Backend (FastAPI + SQLAlchemy + PostgreSQL)

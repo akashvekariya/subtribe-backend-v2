@@ -10,7 +10,7 @@ from sqlalchemy import TIMESTAMP, ForeignKey, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.application import Application
@@ -56,4 +56,8 @@ class ApplicationStatusHistory(Base):
     changed_by_user: Mapped[User | None] = relationship("User", foreign_keys=[changed_by])
 
     def __repr__(self) -> str:
-        return f"<ApplicationStatusHistory(id={self.id}, {self.from_status} -> {self.to_status}, changed_by={self.changed_by}, notes={self.notes})>"
+        return (
+            f"<ApplicationStatusHistory(id={self.id}, "
+            f"{self.from_status} -> {self.to_status}, "
+            f"changed_by={self.changed_by}, notes={self.notes})>"
+        )

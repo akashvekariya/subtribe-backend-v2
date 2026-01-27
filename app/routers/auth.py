@@ -1,60 +1,65 @@
 """Authentication endpoints."""
 
-from datetime import datetime, timedelta, timezone
+import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
-from jose import jwt
-from passlib.context import CryptContext
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
-from app.database import get_db
-from app.dependencies import get_current_user
-from app.exceptions import ConflictError, NotFoundError, UnauthorizedError, ValidationError
+from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.core.security import delete_auth_cookie, set_auth_cookie
 from app.models.company import Company
 from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
+    ClaimInviteRequest,
+    ClaimInviteResponse,
     CompanyResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginRequest,
     MeResponse,
     RegisterRequest,
+    ResendVerificationRequest,
+    ResendVerificationResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     UserResponse,
+    ValidateResetTokenRequest,
+    ValidateResetTokenResponse,
+    VerifyEmailRequest,
+    VerifyEmailResponse,
 )
+from app.services.auth_service import AuthService
+from app.utils.rate_limiter import password_reset_limiter
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def hash_password(password: str) -> str:
-    """Hash a password using bcrypt."""
-    return pwd_context.hash(password)
+def build_user_response(user: User, company: Company | None = None) -> UserResponse:
+    """Build UserResponse from User model."""
+    company_response = None
+    if company:
+        company_response = CompanyResponse(
+            id=str(company.id),
+            name=company.name,
+            slug=company.slug,
+            logo_url=company.logo_url,
+            onboarding_completed=company.onboarding_completed,
+        )
 
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def create_access_token(
-    user_id: str, company_id: str, email: str, first_name: str, last_name: str
-) -> tuple[str, datetime]:
-    """Create JWT access token with user claims."""
-    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.jwt_expiry_days)
-
-    payload = {
-        "sub": user_id,
-        "company_id": company_id,
-        "email": email,
-        "first_name": first_name,
-        "last_name": last_name,
-        "exp": expires_at,
-    }
-
-    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
-    return token, expires_at
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        avatar_url=user.avatar_url,
+        email_verified=user.email_verified,
+        pending_onboarding=user.pending_onboarding,
+        company=company_response,
+    )
 
 
 @router.post(
@@ -62,170 +67,93 @@ def create_access_token(
 )
 async def register(response: Response, data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """
-    Register new user with company code.
+    Register new user.
 
-    - Validates company code exists
-    - Creates user with hashed password
-    - Returns JWT with company_id claim
+    Creates user account WITHOUT organization. User must claim an invite code
+    after email verification to join or create an organization.
+
+    Flow:
+    1. User registers (this endpoint)
+    2. User verifies email
+    3. User enters invite code (/auth/claim-invite)
+       - org_creator invite -> User goes to onboarding to create org
+       - team_member invite -> User joins existing org
     """
-    # Check if email already exists
-    stmt = select(User).where(User.email == data.email)
-    result = await db.execute(stmt)
-    existing_user = result.scalar_one_or_none()
-
-    if existing_user:
-        raise ConflictError(message="Email already registered", code="duplicate_email")
-
-    # Validate company code
-    stmt = select(Company).where(Company.invite_code == data.company_code)
-    result = await db.execute(stmt)
-    company = result.scalar_one_or_none()
-
-    if not company:
-        raise NotFoundError(
-            message="Company not found with the provided code", code="company_not_found"
-        )
-
-    if not company.is_active:
-        raise ValidationError(message="Company is not active", code="company_inactive")
-
-    # Hash password
-    password_hash = hash_password(data.password)
-
-    # Create user
-    user = User(
-        company_id=company.id,
+    auth_service = AuthService(db)
+    result = await auth_service.register(
         email=data.email,
-        password_hash=password_hash,
+        password=data.password,
         first_name=data.first_name,
         last_name=data.last_name,
-        role="admin",  # Everyone is admin in MVP
-        is_active=True,
-        last_login_at=datetime.now(timezone.utc),
     )
 
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    await db.refresh(company)
+    set_auth_cookie(response, result.access_token)
 
-    # Create JWT
-    access_token, expires_at = create_access_token(
-        user_id=str(user.id),
-        company_id=str(company.id),
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-    )
-
-    # Set httpOnly cookie (secure for browsers)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,  # Not accessible via JavaScript
-        secure=settings.environment == "production",  # HTTPS only in production
-        samesite="lax",  # CSRF protection
-        max_age=settings.jwt_expiry_days * 24 * 60 * 60,  # seconds
-    )
-
-    # Build response (also return token in body for API clients)
     return AuthResponse(
-        user=UserResponse(
-            id=str(user.id),
-            email=user.email,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            avatar_url=user.avatar_url,
-            company=CompanyResponse(
-                id=str(company.id), name=company.name, slug=company.slug, logo_url=company.logo_url
-            ),
-        ),
-        access_token=access_token,
-        expires_at=expires_at,
+        user=build_user_response(result.user, result.company),
+        access_token=result.access_token,
+        expires_at=result.expires_at,
+        message="Account created. Please check your email to verify.",
     )
 
 
 @router.post("/login", response_model=AuthResponse, tags=["Auth"])
-async def login(response: Response, data: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    response: Response,
+    data: LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """
     Login with email/password.
 
-    - Validates credentials
-    - Updates last_login_at
-    - Returns JWT with company_id claim
+    Returns JWT with user claims. Works for users with or without company.
+    Implements account lockout after 5 failed attempts (15 min lockout).
     """
-    # Find user by email
-    stmt = select(User).where(User.email == data.email)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    auth_service = AuthService(db)
+    client_ip = request.client.host if request.client else None
 
-    if not user:
-        raise UnauthorizedError(message="Invalid email or password", code="invalid_credentials")
-
-    # Verify password
-    if not verify_password(data.password, user.password_hash):
-        raise UnauthorizedError(message="Invalid email or password", code="invalid_credentials")
-
-    # Check if user is active
-    if not user.is_active:
-        raise UnauthorizedError(message="Account is inactive", code="account_inactive")
-
-    # Get company
-    stmt = select(Company).where(Company.id == user.company_id)
-    result = await db.execute(stmt)
-    company = result.scalar_one_or_none()
-
-    if not company or not company.is_active:
-        raise UnauthorizedError(message="Company is not active", code="company_inactive")
-
-    # Update last login
-    user.last_login_at = datetime.now(timezone.utc)
-    await db.commit()
-
-    # Create JWT
-    access_token, expires_at = create_access_token(
-        user_id=str(user.id),
-        company_id=str(company.id),
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
+    result = await auth_service.login(
+        email=data.email,
+        password=data.password,
+        client_ip=client_ip,
     )
 
-    # Set httpOnly cookie (secure for browsers)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,  # Not accessible via JavaScript
-        secure=settings.environment == "production",  # HTTPS only in production
-        samesite="lax",  # CSRF protection
-        max_age=settings.jwt_expiry_days * 24 * 60 * 60,  # seconds
-    )
+    set_auth_cookie(response, result.access_token)
 
-    # Build response (also return token in body for API clients)
     return AuthResponse(
-        user=UserResponse(
-            id=str(user.id),
-            email=user.email,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            avatar_url=user.avatar_url,
-            company=CompanyResponse(
-                id=str(company.id), name=company.name, slug=company.slug, logo_url=company.logo_url
-            ),
-        ),
-        access_token=access_token,
-        expires_at=expires_at,
+        user=build_user_response(result.user, result.company),
+        access_token=result.access_token,
+        expires_at=result.expires_at,
     )
+
+
+@router.post("/verify-email", response_model=VerifyEmailResponse, tags=["Auth"])
+async def verify_email(data: VerifyEmailRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Verify email address using token from verification email.
+    """
+    auth_service = AuthService(db)
+    success, message = await auth_service.verify_email(data.token)
+    return VerifyEmailResponse(success=success, message=message)
+
+
+@router.post("/resend-verification", response_model=ResendVerificationResponse, tags=["Auth"])
+async def resend_verification(data: ResendVerificationRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Resend verification email.
+    """
+    auth_service = AuthService(db)
+    success, message = await auth_service.resend_verification(data.email)
+    return ResendVerificationResponse(success=success, message=message)
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK, tags=["Auth"])
 async def logout(response: Response):
     """
     Logout user by clearing authentication cookie.
-
-    Note: For API clients using Authorization header, simply discard the token on client side.
     """
-    response.delete_cookie(key="access_token")
+    delete_auth_cookie(response)
     return {"message": "Successfully logged out"}
 
 
@@ -236,36 +164,145 @@ async def get_me(
     """
     Get current user info from JWT.
 
-    - Extracts user_id from JWT
-    - Returns full user details with company
+    Returns user details including email_verified status and company info.
     """
-    # Get user from database
+    auth_service = AuthService(db)
     user_id = UUID(current_user["user_id"])
 
-    stmt = select(User).where(User.id == user_id)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    user, company = await auth_service.get_user_with_company(user_id)
 
     if not user:
+        from app.core.exceptions import NotFoundError
+
         raise NotFoundError(message="User not found", code="user_not_found")
 
-    # Get company
-    stmt = select(Company).where(Company.id == user.company_id)
-    result = await db.execute(stmt)
-    company = result.scalar_one_or_none()
+    company_response = None
+    if company:
+        company_response = CompanyResponse(
+            id=str(company.id),
+            name=company.name,
+            slug=company.slug,
+            logo_url=company.logo_url,
+            onboarding_completed=company.onboarding_completed,
+        )
 
-    if not company:
-        raise NotFoundError(message="Company not found", code="company_not_found")
-
-    # Build response
     return MeResponse(
         id=str(user.id),
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
         avatar_url=user.avatar_url,
-        company=CompanyResponse(
-            id=str(company.id), name=company.name, slug=company.slug, logo_url=company.logo_url
-        ),
+        email_verified=user.email_verified,
+        pending_onboarding=user.pending_onboarding,
+        company=company_response,
         last_login_at=user.last_login_at,
     )
+
+
+@router.post("/claim-invite", response_model=ClaimInviteResponse, tags=["Auth"])
+async def claim_invite(
+    response: Response,
+    data: ClaimInviteRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Claim an invite code to join or create an organization.
+
+    This endpoint is called after email verification. It handles two invite types:
+    - org_creator: Sets pending_onboarding=True, user goes to onboarding to create org
+    - team_member: Assigns user to the invite's company immediately
+    """
+    auth_service = AuthService(db)
+    user_id = UUID(current_user["user_id"])
+
+    result = await auth_service.claim_invite(user_id, data.code)
+
+    set_auth_cookie(response, result.access_token)
+
+    company_response = None
+    if result.company:
+        company_response = CompanyResponse(
+            id=str(result.company.id),
+            name=result.company.name,
+            slug=result.company.slug,
+            logo_url=result.company.logo_url,
+            onboarding_completed=result.company.onboarding_completed,
+        )
+
+    return ClaimInviteResponse(
+        success=True,
+        invite_type=result.invite_type,
+        company=company_response,
+        redirect_to=result.redirect_to,
+        message=result.message,
+        access_token=result.access_token,
+    )
+
+
+# =============================================================================
+# Password Reset Endpoints
+# =============================================================================
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse, tags=["Auth"])
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Request a password reset email.
+
+    Always returns success to prevent email enumeration.
+    Rate limited to 3 requests per email per hour.
+    """
+    email_lower = data.email.lower()
+
+    # Check rate limit
+    if not password_reset_limiter.is_allowed(email_lower):
+        logger.warning(f"Rate limit exceeded for password reset: {email_lower}")
+        return ForgotPasswordResponse()
+
+    password_reset_limiter.record(email_lower)
+
+    auth_service = AuthService(db)
+    await auth_service.request_password_reset(data.email)
+
+    return ForgotPasswordResponse()
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse, tags=["Auth"])
+async def reset_password(
+    data: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Reset password using a valid reset token.
+
+    Token must be valid and not expired.
+    Password must meet strength requirements (8+ chars, uppercase, number, special char).
+    Clears reset token after successful reset.
+    """
+    auth_service = AuthService(db)
+    await auth_service.reset_password(data.token, data.password)
+    return ResetPasswordResponse()
+
+
+@router.post("/validate-reset-token", response_model=ValidateResetTokenResponse, tags=["Auth"])
+async def validate_reset_token(
+    data: ValidateResetTokenRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Validate a password reset token.
+
+    Returns whether the token is valid and a masked email.
+    Used by frontend to show appropriate UI before user enters new password.
+    """
+    auth_service = AuthService(db)
+    valid, masked_email, message = await auth_service.validate_reset_token(data.token)
+
+    if valid:
+        return ValidateResetTokenResponse(valid=True, email=masked_email)
+    else:
+        return ValidateResetTokenResponse(valid=False, message=message)

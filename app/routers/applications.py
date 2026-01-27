@@ -1,37 +1,32 @@
 """Application management endpoints."""
 
-import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
-from functools import partial
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 
-from app.database import get_db
-from app.dependencies import get_current_user
-from app.exceptions import AppException, ConflictError, NotFoundError
-from app.models.application import Application
-from app.models.job import Job
-from app.models.status_history import ApplicationStatusHistory
+from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.schemas.application import (
     ApplicationDetail,
     ApplicationStatusUpdate,
     ApplicationSubmitted,
     JobBasic,
     ResumeUrl,
+    ScheduledEmailItem,
+    ScheduledEmailsResponse,
     StatusHistoryItem,
     StatusHistoryResponse,
     UserBasic,
 )
-from app.services.storage import storage_service
+from app.services.application_service import ApplicationService
+from app.services.evaluation.auto_trigger import trigger_evaluation_for_application
 
 router = APIRouter()  # Protected endpoints
 public_router = APIRouter()  # Public endpoints (no auth)
 logger = logging.getLogger(__name__)
+
 
 # ============================================================================
 # Public Endpoints (No Auth Required)
@@ -53,10 +48,11 @@ async def submit_application(
     linkedin_url: str | None = Form(None),
     github_url: str | None = Form(None),
     portfolio_url: str | None = Form(None),
+    cover_letter: str | None = Form(None, max_length=5000),
     current_ctc: int | None = Form(None),
     expected_ctc: int | None = Form(None),
     notice_period_days: int | None = Form(None),
-    screening_answers: str | None = Form(None),  # JSON string
+    screening_answers: str | None = Form(None),
     resume: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -69,125 +65,40 @@ async def submit_application(
 
     Returns application ID and confirmation message.
     """
-    import json
-
-    # 1. Validate job exists and is active
-    result = await db.execute(select(Job).where(Job.slug == slug))
-    job = result.scalar_one_or_none()
-
-    if not job or job.status != "active":
-        raise NotFoundError(
-            message="Job not found or no longer accepting applications", code="job_not_active"
-        )
-
-    # 2. Validate file type (PDF only - strict)
-    if not resume.content_type or resume.content_type != "application/pdf":
-        raise AppException(
-            message="Only PDF files are allowed", code="invalid_file_type", status_code=400
-        )
-
-    # 3. Validate file size (max 5MB)
-    resume.file.seek(0, 2)  # Seek to end
-    file_size = resume.file.tell()
-    resume.file.seek(0)  # Reset to beginning
-
-    max_size_bytes = 5 * 1024 * 1024  # 5MB
-    if file_size > max_size_bytes:
-        raise AppException(
-            message="File too large (max 5MB)", code="file_too_large", status_code=400
-        )
-
-    # 4. Check for duplicate application (same email for this job)
-    existing = await db.execute(
-        select(Application).where(
-            Application.job_id == job.id, Application.email == email.lower().strip()
-        )
+    service = ApplicationService(db)
+    application = await service.submit_application(
+        slug=slug,
+        first_name=first_name,
+        last_name=last_name,
+        email=email,
+        resume=resume,
+        phone=phone,
+        linkedin_url=linkedin_url,
+        github_url=github_url,
+        portfolio_url=portfolio_url,
+        cover_letter=cover_letter,
+        current_ctc=current_ctc,
+        expected_ctc=expected_ctc,
+        notice_period_days=notice_period_days,
+        screening_answers=screening_answers,
     )
-    if existing.scalar_one_or_none():
-        raise ConflictError(
-            message="You have already applied to this job", code="duplicate_application"
-        )
 
-    # 5. Parse screening answers if provided
-    parsed_answers = {}
-    if screening_answers:
-        try:
-            parsed_answers = json.loads(screening_answers)
-        except json.JSONDecodeError:
-            raise AppException(
-                message="Invalid screening_answers format (must be valid JSON)",
-                code="invalid_json",
-                status_code=400,
-            ) from None
-
-    # 6. Create application and upload resume
+    # Auto-trigger evaluation if job is calibrated
     try:
-        # Create application record
-        application = Application(
-            job_id=job.id,
-            company_id=job.company_id,
-            first_name=first_name.strip(),
-            last_name=last_name.strip(),
-            email=email.lower().strip(),
-            phone=phone.strip() if phone else None,
-            linkedin_url=linkedin_url if linkedin_url else None,
-            github_url=github_url if github_url else None,
-            portfolio_url=portfolio_url if portfolio_url else None,
-            current_ctc=current_ctc,
-            expected_ctc=expected_ctc,
-            notice_period_days=notice_period_days,
-            screening_answers=parsed_answers,
-            status="applied",
-            resume_url="",  # Will be updated after upload
-            resume_filename=resume.filename,
-        )
-
-        db.add(application)
-        await db.flush()  # Get application.id
-
-        # Create initial status history entry (applied)
-        initial_history = ApplicationStatusHistory(
-            application_id=application.id,
-            from_status=None,  # First status, no previous status
-            to_status="applied",
-            changed_by=None,  # Public application, no user
-            notes="Application submitted",
-        )
-        db.add(initial_history)
-
-        # Upload resume to GCS (run in thread pool to avoid blocking event loop)
-        full_name = f"{first_name} {last_name}"
-        loop = asyncio.get_event_loop()
-        resume_uri = await loop.run_in_executor(
-            None,
-            partial(
-                storage_service.upload_resume,
-                file=resume.file,
-                company_id=str(job.company_id),
-                job_id=str(job.id),
-                application_id=str(application.id),
-                full_name=full_name,
-                content_type=resume.content_type,
-            ),
-        )
-
-        # Update application with resume URL
-        application.resume_url = resume_uri
-
-        # Commit the transaction
-        await db.commit()
-        await db.refresh(application)
-
+        triggered = await trigger_evaluation_for_application(db, application.id)
+        if triggered:
+            logger.info(
+                "Auto-triggered evaluation for new application",
+                extra={
+                    "application_id": str(application.id),
+                    "job_id": str(application.job_id),
+                },
+            )
     except Exception as e:
-        # Upload failed - rollback
-        await db.rollback()
-        logger.error(f"Application creation failed: {str(e)}")
-        raise AppException(
-            message="Failed to upload resume. Please try again.",
-            code="upload_failed",
-            status_code=503,
-        ) from e
-    logger.info(f"Application submitted: {application.id} for job {job.id} by {email}")
+        logger.warning(
+            f"Failed to auto-trigger evaluation: {e}",
+            extra={"application_id": str(application.id)},
+        )
 
     return ApplicationSubmitted(id=application.id)
 
@@ -210,23 +121,14 @@ async def get_application(
 
     Returns full application details including job info.
     """
-    # Fetch application with job relationship
-    result = await db.execute(
-        select(Application)
-        .options(joinedload(Application.job))
-        .where(
-            Application.id == application_id, Application.company_id == current_user["company_id"]
-        )
-    )
-    application = result.scalar_one_or_none()
+    service = ApplicationService(db)
+    application = await service.get_application(current_user["company_id"], application_id)
 
-    if not application:
-        raise NotFoundError(message="Application not found", code="application_not_found")
-
-    # Build response with job info
     response_data = ApplicationDetail.model_validate(application)
     response_data.job = JobBasic(
-        id=application.job.id, title=application.job.title, slug=application.job.slug
+        id=application.job.id,
+        title=application.job.title,
+        slug=application.job.slug,
     )
 
     return response_data
@@ -245,35 +147,14 @@ async def get_resume_view_url(
 
     Returns signed URL with 1-hour expiry (inline disposition).
     """
-    # Fetch application
-    result = await db.execute(
-        select(Application).where(
-            Application.id == application_id, Application.company_id == current_user["company_id"]
-        )
+    service = ApplicationService(db)
+    result = await service.get_resume_view_url(current_user["company_id"], application_id)
+
+    return ResumeUrl(
+        url=result.url,
+        filename=result.filename,
+        expires_at=result.expires_at,
     )
-    application = result.scalar_one_or_none()
-
-    if not application:
-        raise NotFoundError(message="Application not found", code="application_not_found")
-
-    # Generate signed URL for viewing (run in thread pool)
-    try:
-        loop = asyncio.get_event_loop()
-        signed_url = await loop.run_in_executor(
-            None, storage_service.get_resume_view_url, application.resume_url
-        )
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-
-        return ResumeUrl(
-            url=signed_url,
-            filename=application.resume_filename or "resume.pdf",
-            expires_at=expires_at,
-        )
-    except Exception as e:
-        logger.error(f"Failed to generate view URL: {str(e)}")
-        raise AppException(
-            message="Failed to generate resume URL", code="url_generation_failed", status_code=503
-        ) from e
 
 
 @router.get("/{application_id}/resume/download", response_model=ResumeUrl, tags=["Applications"])
@@ -289,37 +170,14 @@ async def get_resume_download_url(
 
     Returns signed URL with 1-hour expiry (attachment disposition).
     """
-    # Fetch application
-    result = await db.execute(
-        select(Application).where(
-            Application.id == application_id, Application.company_id == current_user["company_id"]
-        )
+    service = ApplicationService(db)
+    result = await service.get_resume_download_url(current_user["company_id"], application_id)
+
+    return ResumeUrl(
+        url=result.url,
+        filename=result.filename,
+        expires_at=result.expires_at,
     )
-    application = result.scalar_one_or_none()
-
-    if not application:
-        raise NotFoundError(message="Application not found", code="application_not_found")
-
-    # Generate signed URL for download (run in thread pool)
-    try:
-        loop = asyncio.get_event_loop()
-        signed_url = await loop.run_in_executor(
-            None, storage_service.get_resume_download_url, application.resume_url
-        )
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-
-        return ResumeUrl(
-            url=signed_url,
-            filename=application.resume_filename or "resume.pdf",
-            expires_at=expires_at,
-        )
-    except Exception as e:
-        logger.error(f"Failed to generate download URL: {str(e)}")
-        raise AppException(
-            message="Failed to generate resume download URL",
-            code="url_generation_failed",
-            status_code=503,
-        ) from e
 
 
 @router.patch("/{application_id}", response_model=ApplicationDetail, tags=["Applications"])
@@ -330,71 +188,37 @@ async def update_application_status(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Update application status (for Phase 7 - Status Management).
+    Update application status.
 
     - **application_id**: Application UUID
     - **status**: New status
     - **notes**: Required notes about status change
 
     Returns updated application details.
-
-    Note: This endpoint will create status history entries in Phase 7.
     """
-    # Fetch application
-    result = await db.execute(
-        select(Application)
-        .options(joinedload(Application.job))
-        .where(
-            Application.id == application_id, Application.company_id == current_user["company_id"]
-        )
+    service = ApplicationService(db)
+    application = await service.update_status(
+        company_id=current_user["company_id"],
+        application_id=application_id,
+        new_status=data.status,
+        notes=data.notes,
+        user_id=current_user["user_id"],
     )
-    application = result.scalar_one_or_none()
 
-    if not application:
-        raise NotFoundError(message="Application not found", code="application_not_found")
-
-    # Update status
-    old_status = application.status
-
-    # Only update if status actually changed
-    if old_status != data.status:
-        application.status = data.status
-        application.updated_at = datetime.now(timezone.utc)
-
-        # Create status history entry only when status changes
-        history_entry = ApplicationStatusHistory(
-            application_id=application.id,
-            from_status=old_status,
-            to_status=data.status,
-            changed_by=current_user["user_id"],
-            notes=data.notes,
-        )
-        db.add(history_entry)
-
-        await db.commit()
-        await db.refresh(application)
-
-        logger.info(
-            f"Application {application_id} status updated: {old_status} -> {data.status} "
-            f"by user {current_user['user_id']}"
-        )
-    else:
-        # Status unchanged - no history entry needed
-        logger.info(
-            f"Application {application_id} status unchanged ({old_status}), no history created"
-        )
-
-    # Build response
     response_data = ApplicationDetail.model_validate(application)
     response_data.job = JobBasic(
-        id=application.job.id, title=application.job.title, slug=application.job.slug
+        id=application.job.id,
+        title=application.job.title,
+        slug=application.job.slug,
     )
 
     return response_data
 
 
 @router.get(
-    "/{application_id}/history", response_model=StatusHistoryResponse, tags=["Applications"]
+    "/{application_id}/history",
+    response_model=StatusHistoryResponse,
+    tags=["Applications"],
 )
 async def get_application_history(
     application_id: UUID,
@@ -408,45 +232,61 @@ async def get_application_history(
 
     Returns list of status changes with user info and notes (newest first).
     """
-    # Verify application exists and belongs to user's company
-    app_result = await db.execute(
-        select(Application).where(
-            Application.id == application_id, Application.company_id == current_user["company_id"]
+    service = ApplicationService(db)
+    history = await service.get_status_history(current_user["company_id"], application_id)
+
+    history_items = [
+        StatusHistoryItem(
+            id=entry.id,
+            from_status=entry.from_status,
+            to_status=entry.to_status,
+            changed_by=UserBasic(id=entry.changed_by_id, full_name=entry.changed_by_name)
+            if entry.changed_by_id
+            else None,
+            notes=entry.notes,
+            created_at=entry.created_at,
         )
-    )
-    application = app_result.scalar_one_or_none()
-
-    if not application:
-        raise NotFoundError(message="Application not found", code="application_not_found")
-
-    # Fetch status history with user details (newest first)
-    history_result = await db.execute(
-        select(ApplicationStatusHistory)
-        .options(joinedload(ApplicationStatusHistory.changed_by_user))
-        .where(ApplicationStatusHistory.application_id == application_id)
-        .order_by(ApplicationStatusHistory.created_at.desc())
-    )
-    history_entries = history_result.scalars().all()
-
-    # Build response with user details
-    history_items = []
-    for entry in history_entries:
-        # Build user info if changed_by_user relationship exists
-        user_info = None
-        if entry.changed_by_user:
-            user_info = UserBasic(
-                id=entry.changed_by_user.id, full_name=entry.changed_by_user.full_name
-            )
-
-        history_items.append(
-            StatusHistoryItem(
-                id=entry.id,
-                from_status=entry.from_status,
-                to_status=entry.to_status,
-                changed_by=user_info,
-                notes=entry.notes,
-                created_at=entry.created_at,
-            )
-        )
+        for entry in history
+    ]
 
     return StatusHistoryResponse(data=history_items)
+
+
+@router.get(
+    "/{application_id}/scheduled-emails",
+    response_model=ScheduledEmailsResponse,
+    tags=["Applications"],
+)
+async def get_application_scheduled_emails(
+    application_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get scheduled emails for an application.
+
+    - **application_id**: Application UUID
+
+    Returns list of scheduled emails (newest first).
+    """
+    service = ApplicationService(db)
+    emails = await service.get_scheduled_emails(current_user["company_id"], application_id)
+
+    email_items = [
+        ScheduledEmailItem(
+            id=email.id,
+            template_type=email.template_type,
+            recipient_email=email.recipient_email,
+            recipient_name=email.recipient_name,
+            subject=email.subject,
+            scheduled_for=email.scheduled_for,
+            status=email.status,
+            sent_at=email.sent_at,
+            provider_message_id=email.provider_message_id,
+            error_message=email.error_message,
+            created_at=email.created_at,
+        )
+        for email in emails
+    ]
+
+    return ScheduledEmailsResponse(data=email_items)

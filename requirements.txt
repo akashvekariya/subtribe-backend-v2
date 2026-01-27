@@ -17,15 +17,22 @@ psycopg2-binary  # For Alembic migrations
 
 # Authentication & Security
 python-jose[cryptography]
-passlib==1.7.4
-bcrypt==3.2.2  # Version compatible with passlib 1.7.4
+bcrypt>=4.0.0
 python-multipart
 
 # Cloud Storage
 google-cloud-storage
 
+# Email Service
+sendgrid>=6.10.0
+google-cloud-tasks>=2.13.0
+pytz>=2023.3
+
 # HTTP Client
 httpx
+
+# Logging
+python-json-logger==2.0.7
 
 # Testing
 pytest
@@ -35,5 +42,4 @@ aiosqlite
 # Code Quality & Linting (Development)
 ruff  # Fast Python linter & formatter
 mypy  # Static type checker
-types-passlib  # Type stubs for passlib
 types-python-jose  # Type stubs for python-jose
